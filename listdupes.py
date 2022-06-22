@@ -97,6 +97,7 @@ class ProgressCounter(Cursor):
 
     def print_text_before_counter(self, end_with_space=True):
         """Provide context about a counter by printing text before it.
+
         Prints the value of text_before_counter provided to the class's
         constructor (Defaults to printing no text).
         Example text: 'Checking file'
