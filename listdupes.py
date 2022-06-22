@@ -179,11 +179,11 @@ def checksum_paths(collection_of_paths):
 
     Positional Args:
         collection_of_paths: A collection of strings, or instances of
-        pathlib.Path and its subclasses.
+            pathlib.Path and its subclasses.
 
     Returns:
         A list of tuples, each containing a file path and the checksum
-        of the corresponding file.
+            of the corresponding file.
     """
 
     paths_and_checksums = []
@@ -225,7 +225,7 @@ def find_dupes(paths_and_checksums):
 
     Positional Args:
         paths_and_checksums: A list of tuples, each containing a file
-        path and the checksum of the corresponding file.
+            path and the checksum of the corresponding file.
 
     Returns:
         A dictionary of paths mapped to lists of any other paths whose
