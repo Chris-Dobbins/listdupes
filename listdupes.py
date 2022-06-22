@@ -7,7 +7,7 @@ Writes its output to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
-__version__ = "4.0.0"
+__version__ = "4.0.1"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
@@ -27,8 +27,11 @@ class Cursor:
     hide_cursor = "\x1b[?25l"
     show_cursor = "\x1b[?25h"
 
+    def __init__(self, output=sys.stderr):
+        self.output = output
+
     def hide_cursor_from_user(self):
-        print(self.hide_cursor, file=self.output, end="")
+        print(Cursor.hide_cursor, file=self.output, end="")
 
     def set_cursor_column_to(self, column_number):
         set_cursor_column_esc_code = f"\x1b[{column_number}G"
