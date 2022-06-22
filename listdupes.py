@@ -132,7 +132,7 @@ class ProgressCounter(Cursor):
                 should be inserted between the counter and the text.
         """
 
-        starting_character = " " if begin_with_space else ""
+        beginning_character = " " if begin_with_space else ""
         formatted_text = self.text_after_counter.format(self.total_to_be_counted)
         self.set_cursor_column_to(starting_column_for_cursor)
         print(
