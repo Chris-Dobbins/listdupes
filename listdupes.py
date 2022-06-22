@@ -7,7 +7,7 @@ Writes its output to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
-__version__ = "4.0.1"
+__version__ = "Internal"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
@@ -24,7 +24,9 @@ from zlib import crc32 as checksummer
 
 # Classes
 class Cursor:
-    hide_cursor = "\x1b[?25l"
+    """Provides structure to subclasses which write to terminal."""
+
+    hide_cursor = "\x1b[?25l"  # Terminal escape codes.
     show_cursor = "\x1b[?25h"
 
     def __init__(self, output=sys.stderr):
@@ -109,6 +111,7 @@ class ProgressCounter(Cursor):
         )
 
     def end_count(self, append_newline=True):
+        """Place the cursor at the end of the line and show it."""
         end_arg = "\n" if append_newline else ""
         self.set_cursor_column_to(self.after_text)
         print(self.show_cursor, file=self.output, end=end_arg)
@@ -140,6 +143,17 @@ def make_file_path_unique(path):
 
 
 def checksum_paths(collection_of_paths):
+    """Checksums files and stores their checksums alongside their paths.
+
+    Positional Args:
+        collection_of_paths: A collection of strings, or instances of
+        pathlib.Path and its subclasses.
+
+    Returns:
+        A list of tuples, each containing a file path and the checksum
+        of the corresponding file.
+    """
+
     paths_and_checksums = []
     for file_path in collection_of_paths:
         try:
@@ -152,6 +166,7 @@ def checksum_paths(collection_of_paths):
 
 
 def checksum_paths_and_show_progress(collection_of_paths):
+    """As checksum_paths but prints the loop's progress to terminal."""
     checksum_progress = ProgressCounter(
         len(collection_of_paths),
         text_before_counter="Checking file ",
@@ -174,11 +189,22 @@ def checksum_paths_and_show_progress(collection_of_paths):
 
 
 def find_dupes(paths_and_checksums):
+    """Finds duplicate files by comparing their checksums.
+
+    Positional Args:
+        paths_and_checksums: A list of tuples, each containing a file
+        path and the checksum of the corresponding file.
+
+    Returns:
+        A dictionary of paths mapped to lists of any other paths whose
+            checksums match the first.
+    """
+
     dupes = collections.defaultdict(list)
     for index, element in enumerate(paths_and_checksums):
         path_being_searched, checksum_being_searched = element
 
-        for current_path, current_checksum in paths_and_checksums[index + 1 :]:
+        for current_path, current_checksum in paths_and_checksums[index + 1:]:
             checksums_are_equal = checksum_being_searched == current_checksum
             if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
                 dupes[path_being_searched].append(current_path)
@@ -186,6 +212,7 @@ def find_dupes(paths_and_checksums):
 
 
 def find_dupes_and_show_progress(paths_and_checksums):
+    """As find_dupes but prints the loop's progress to terminal."""
     comparisons_progress = ProgressCounter(
         len(paths_and_checksums),
         text_before_counter="Comparing file ",
@@ -198,7 +225,7 @@ def find_dupes_and_show_progress(paths_and_checksums):
             path_being_searched, checksum_being_searched = element
             comparisons_progress.print_counter(index)
 
-            for current_path, current_checksum in paths_and_checksums[index + 1 :]:
+            for current_path, current_checksum in paths_and_checksums[index + 1:]:
                 checksums_are_equal = checksum_being_searched == current_checksum
                 if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
                     dupes[path_being_searched].append(current_path)
