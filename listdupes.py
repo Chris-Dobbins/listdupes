@@ -95,48 +95,33 @@ class ProgressCounter(Cursor):
         if (current_index + 1) == self.total_to_be_counted:
             self.end_count()
 
-    def print_text_before_counter(self, end_with_space=True):
+    def print_text_before_counter(self):
         """Provide context about a counter by printing text before it.
 
         Prints the value of text_before_counter provided to the class's
         constructor (Defaults to printing no text).
-        Example text: 'Checking file'
-
-        Optional Args:
-            end_with_space: A bool indicating whether or not a space
-                should be inserted between the text and the counter.
+        Example text: 'Checking file '
         """
 
-        end_arg = " " if end_with_space else ""
-        print(self.text_before_counter, file=self.output, end=end_arg)
+        print(self.text_before_counter, file=self.output, end="")
 
-    def print_text_after_counter(
-        self,
-        starting_column_for_cursor,
-        begin_with_space=True,
-    ):
+    def print_text_after_counter(self, starting_column_for_cursor):
         """Provide context about a counter by printing text after it.
 
         Prints the value of text_after_counter provided to the class's
         constructor (Defaults to printing no text). If the str provides
         a replacement field the total number of the counter will be
         inserted there.
-        Example text: 'of {}.'
+        Example text: ' of {}.'
 
         Positional Args:
             starting_column_for_cursor: An int which determines at which
                 column the text starts printing
-
-        Optional Args:
-            begin_with_space: A bool indicating whether or not a space
-                should be inserted between the counter and the text.
         """
 
-        beginning_character = " " if begin_with_space else ""
         formatted_text = self.text_after_counter.format(self.total_to_be_counted)
         self.set_cursor_column_to(starting_column_for_cursor)
         print(
-            beginning_character,
             formatted_text,
             sep="",
             file=self.output,
@@ -248,8 +233,8 @@ def find_dupes_and_show_progress(paths_and_checksums):
     """As find_dupes but prints the loop's progress to terminal."""
     comparisons_progress = ProgressCounter(
         len(paths_and_checksums),
-        text_before_counter="Comparing file",
-        text_after_counter="of {}.",
+        text_before_counter="Comparing file ",
+        text_after_counter=" of {}.",
     )
     dupes = collections.defaultdict(list)
     try:
