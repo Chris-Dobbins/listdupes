@@ -294,7 +294,7 @@ def get_listdupes_args(overriding_args=None):
     effectively overriding sys.argv. The returned object uses the
     arguments's long names as attributes, with each attribute holding
     the result of parsing that argument.
-    E.g. arg.progress contains the value of the --progress argument.
+    E.g. args.progress contains the value of the --progress argument.
 
     Optional Args:
         overriding_args: Accepts a list of strings to parse.
