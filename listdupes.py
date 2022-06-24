@@ -324,7 +324,7 @@ def get_listdupes_args(overriding_args=None):
         "-p",
         "--progress",
         action="store_true",
-        help="Print a progress counter to stderr, can slow things down.",
+        help="Print a progress counter to stderr. This may slow things down.",
     )
     args = parser.parse_args(args=overriding_args)
     return args
