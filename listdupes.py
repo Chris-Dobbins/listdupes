@@ -311,14 +311,20 @@ def get_listdupes_args(overriding_args=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
+        "-h",
+        "--help",
+        action="help",
+        help="Show this help message and exit.",
+    )
+    parser.add_argument(
         "starting_folder",
-        help="accepts a single path from the terminal",
+        help="Accepts a single path from the terminal.",
     )
     parser.add_argument(
         "-p",
         "--progress",
         action="store_true",
-        help="print a progress counter to stderr, can slow things down",
+        help="Print a progress counter to stderr, can slow things down.",
     )
     args = parser.parse_args(args=overriding_args)
     return args
