@@ -332,10 +332,7 @@ def get_listdupes_args(overriding_args=None):
     return args
 
 
-def main(args_object):
-    # Get the app's arguments.
-    args = args_object
-
+def main(starting_path, show_progress=False):
     # Define return value.
     return_value_tuple = collections.namedtuple(
         "return_value_tuple", ["dupes", "error", "return_code"]
@@ -351,23 +348,23 @@ def main(args_object):
         return return_value_tuple({}, error_text, 1)
 
     # Gather all files except for those starting with a period.
-    unexpanded_starting_path = pathlib.Path(args.starting_folder)
+    unexpanded_starting_path = pathlib.Path(starting_path)
     starting_path = unexpanded_starting_path.expanduser()
-    if args.progress:
+    if show_progress:
         glob_module_arg = str(starting_path) + "/**/[!.]*"
         sub_paths = glob.glob(glob_module_arg, recursive=True)
     else:
         sub_paths = starting_path.glob("**/[!.]*")
 
     # Checksum the files.
-    if args.progress:
+    if show_progress:
         files_and_checksums = checksum_paths_and_show_progress(sub_paths)
     else:
         files_and_checksums = checksum_paths(sub_paths)
 
     # Compare the checksums and make a dictionary of duplicate files.
     files_and_checksums.sort()
-    if args.progress:
+    if show_progress:
         dupes = find_dupes_and_show_progress(files_and_checksums)
     else:
         dupes = find_dupes(files_and_checksums)
@@ -387,5 +384,5 @@ def main(args_object):
 # Run the app!
 if __name__ == "__main__":
     args = get_listdupes_args()  # The parser can exit with 2.
-    main_result = main(args)
+    main_result = main(args.starting_folder, progress=args.show_progress)
     sys.exit(main_result.return_code)
