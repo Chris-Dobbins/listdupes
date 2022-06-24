@@ -309,7 +309,9 @@ def get_listdupes_args(overriding_args=None):
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
     )
+    # Replace the default -h with a reformatted help description.
     parser.add_argument(
         "-h",
         "--help",
