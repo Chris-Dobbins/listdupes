@@ -7,7 +7,7 @@ Writes its output to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
-__version__ = "4.0.1"
+__version__ = "Neutral"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
@@ -286,8 +286,26 @@ def handle_exception_at_write_time(exception_info):
     print(style_magenta, error_message, reset_style, sep="", file=sys.stderr)
 
 
-def main():
-    # Parse arguments from the shell.
+def get_listdupes_args(overriding_args=None):
+    """Parses arguments with the argparse module and returns the result.
+
+    By default it parses the arguments passed to sys.argv.
+    Optionally it can parse a different set of arguments,
+    effectively overriding sys.argv. The returned object uses the
+    arguments's long names as attributes, with each attribute holding
+    the result of parsing that argument.
+    E.g. arg.version would contain the result of the --version argument.
+
+    Optional Args:
+        overriding_args: Accepts a list of strings to parse.
+            This is passed to the parser's parse_args() method.
+            When the value is None parse_args() defaults
+            to taking its arguments from sys.argv.
+
+    Returns:
+        An argparse.Namespace object with the app's arguments.
+    """
+
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -302,7 +320,13 @@ def main():
         action="store_true",
         help="print a progress counter to stderr, can slow things down",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(args=overriding_args)
+    return args
+
+
+def main(args_object):
+    # Get the app's arguments.
+    args = args_object
 
     # Determine the output's eventual file path.
     output_file_name = "listdupes_output.csv"
@@ -334,15 +358,26 @@ def main():
     else:
         dupes = find_dupes(files_and_checksums)
 
+    # Define return value.
+    return_value_tuple = collections.namedtuple(
+        "return_value_tuple",
+        ["output", "error", "return_code"],
+    )
+
     # Format the duplicate paths as a CSV and write it to a file.
     try:
         write_output_as_csv(output_path, dupes)
     except Exception:  # Print data to stdout if file can't be written.
         handle_exception_at_write_time(sys.exc_info())
         write_output_as_csv(sys.stdout.fileno(), dupes, open_mode="w")
-        return 1
+        return return_value_tuple(dupes, "", 1)
+
+    # Return successfully.
+    return return_value_tuple(dupes, "", 0)
 
 
 # Run the app!
 if __name__ == "__main__":
-    sys.exit(main())
+    args = get_listdupes_args()  # The parser can exit with 2.
+    main_result = main(args)
+    sys.exit(main_result.return_code)
