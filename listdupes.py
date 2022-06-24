@@ -334,13 +334,19 @@ def main(args_object):
     # Get the app's arguments.
     args = args_object
 
+    # Define return value.
+    return_value_tuple = collections.namedtuple(
+        "return_value_tuple", ["dupes", "error", "return_code"]
+    )
+
     # Determine the output's eventual file path.
     output_file_name = "listdupes_output.csv"
     output_path = pathlib.Path("~", output_file_name).expanduser()
     try:
         output_path = make_file_path_unique(output_path)
     except FileExistsError:
-        sys.exit("Your home folder has a lot of output files. Clean up to proceed.")
+        error_text = "Your home folder has a lot of output files. Clean up to proceed."
+        return return_value_tuple({}, error_text, 1)
 
     # Gather all files except for those starting with a period.
     unexpanded_starting_path = pathlib.Path(args.starting_folder)
@@ -363,12 +369,6 @@ def main(args_object):
         dupes = find_dupes_and_show_progress(files_and_checksums)
     else:
         dupes = find_dupes(files_and_checksums)
-
-    # Define return value.
-    return_value_tuple = collections.namedtuple(
-        "return_value_tuple",
-        ["output", "error", "return_code"],
-    )
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
