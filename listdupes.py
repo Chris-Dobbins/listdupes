@@ -384,5 +384,5 @@ def main(starting_path, show_progress=False):
 # Run the app!
 if __name__ == "__main__":
     args = get_listdupes_args()  # The parser can exit with 2.
-    main_result = main(args.starting_folder, progress=args.show_progress)
+    main_result = main(args.starting_folder, show_progress=args.progress)
     sys.exit(main_result.return_code)
