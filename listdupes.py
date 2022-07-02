@@ -7,7 +7,7 @@ Writes its output to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
-__version__ = "4.0.1"
+__version__ = "Internal"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
@@ -214,18 +214,18 @@ def find_dupes(paths_and_checksums):
             path and the checksum of the corresponding file.
 
     Returns:
-        A dictionary of paths mapped to lists of any other paths whose
+        A dictionary of paths mapped to sets of any other paths whose
             checksums match the first.
     """
 
-    dupes = collections.defaultdict(list)
+    dupes = collections.defaultdict(set)
     for index, element in enumerate(paths_and_checksums):
         path_being_searched, checksum_being_searched = element
 
         for current_path, current_checksum in paths_and_checksums[index + 1 :]:
             checksums_are_equal = checksum_being_searched == current_checksum
             if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
-                dupes[path_being_searched].append(current_path)
+                dupes[path_being_searched].add(current_path)
     return dupes
 
 
@@ -236,7 +236,7 @@ def find_dupes_and_show_progress(paths_and_checksums):
         text_before_counter="Comparing file ",
         text_after_counter=" of {}.",
     )
-    dupes = collections.defaultdict(list)
+    dupes = collections.defaultdict(set)
     try:
         comparisons_progress.print_text_for_counter()
         for index, element in enumerate(paths_and_checksums):
@@ -246,7 +246,7 @@ def find_dupes_and_show_progress(paths_and_checksums):
             for current_path, current_checksum in paths_and_checksums[index + 1 :]:
                 checksums_are_equal = checksum_being_searched == current_checksum
                 if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
-                    dupes[path_being_searched].append(current_path)
+                    dupes[path_being_searched].add(current_path)
     finally:
         comparisons_progress.end_count()
     return dupes
@@ -258,6 +258,14 @@ def path_not_in_dict(path_value, dictionary):
         if path_value in paths:
             return False
     return True
+
+
+def sort_dict_values(dictionary, sort_key=None):
+    """Convert collections in a dict to lists and sort them in place."""
+    for dict_key in dictionary.keys():
+        list_of_values = list(dictionary[dict_key])
+        list_of_values.sort(key=sort_key)
+        dictionary[dict_key] = list_of_values
 
 
 def write_output_as_csv(output_file, dictionary, open_mode="x"):
@@ -333,6 +341,9 @@ def main():
         dupes = find_dupes_and_show_progress(files_and_checksums)
     else:
         dupes = find_dupes(files_and_checksums)
+
+    # Sort the duplicates to prepare them for output.
+    sort_dict_values(dupes)
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
