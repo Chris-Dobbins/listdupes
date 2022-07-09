@@ -294,23 +294,57 @@ def handle_exception_at_write_time(exception_info):
     print(style_magenta, error_message, reset_style, sep="", file=sys.stderr)
 
 
-def main():
-    # Parse arguments from the shell.
+def get_listdupes_args(overriding_args=None):
+    """Parses arguments with the argparse module and returns the result.
+
+    By default it parses the arguments passed to sys.argv.
+    Optionally it can parse a different set of arguments,
+    effectively overriding sys.argv. The returned object uses the
+    arguments's long names as attributes, with each attribute holding
+    the result of parsing that argument.
+    E.g. args.progress contains the value of the --progress argument.
+
+    Optional Args:
+        overriding_args: Accepts a list of strings to parse.
+            This is passed to the parser's parse_args() method.
+            When the value is None parse_args() defaults
+            to taking its arguments from sys.argv.
+
+    Returns:
+        An argparse.Namespace object with the app's arguments.
+    """
+
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
+    )
+    # Replace the default -h with a reformatted help description.
+    parser.add_argument(
+        "-h",
+        "--help",
+        action="help",
+        help="Show this help message and exit.",
     )
     parser.add_argument(
         "starting_folder",
-        help="accepts a single path from the terminal",
+        help="Accepts a single path from the terminal.",
     )
     parser.add_argument(
         "-p",
         "--progress",
         action="store_true",
-        help="print a progress counter to stderr, can slow things down",
+        help="Print a progress counter to stderr. This may slow things down.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(args=overriding_args)
+    return args
+
+
+def main(starting_path, show_progress=False):
+    # Define return value.
+    return_value_tuple = collections.namedtuple(
+        "return_value_tuple", ["dupes", "error", "return_code"]
+    )
 
     # Determine the output's eventual file path.
     output_file_name = "listdupes_output.csv"
@@ -318,26 +352,27 @@ def main():
     try:
         output_path = make_file_path_unique(output_path)
     except FileExistsError:
-        sys.exit("Your home folder has a lot of output files. Clean up to proceed.")
+        error_text = "Your home folder has a lot of output files. Clean up to proceed."
+        return return_value_tuple({}, error_text, 1)
 
     # Gather all files except for those starting with a period.
-    unexpanded_starting_path = pathlib.Path(args.starting_folder)
+    unexpanded_starting_path = pathlib.Path(starting_path)
     starting_path = unexpanded_starting_path.expanduser()
-    if args.progress:
+    if show_progress:
         glob_module_arg = str(starting_path) + "/**/[!.]*"
         sub_paths = glob.glob(glob_module_arg, recursive=True)
     else:
         sub_paths = starting_path.glob("**/[!.]*")
 
     # Checksum the files.
-    if args.progress:
+    if show_progress:
         files_and_checksums = checksum_paths_and_show_progress(sub_paths)
     else:
         files_and_checksums = checksum_paths(sub_paths)
 
     # Compare the checksums and make a dictionary of duplicate files.
     files_and_checksums.sort()
-    if args.progress:
+    if show_progress:
         dupes = find_dupes_and_show_progress(files_and_checksums)
     else:
         dupes = find_dupes(files_and_checksums)
@@ -351,9 +386,15 @@ def main():
     except Exception:  # Print data to stdout if file can't be written.
         handle_exception_at_write_time(sys.exc_info())
         write_output_as_csv(sys.stdout.fileno(), dupes, open_mode="w")
-        return 1
+        error_text = "The file couldn't be written."
+        return return_value_tuple(dupes, error_text, 1)
+
+    # Return successfully.
+    return return_value_tuple(dupes, "", 0)
 
 
 # Run the app!
 if __name__ == "__main__":
-    sys.exit(main())
+    args = get_listdupes_args()  # The parser can exit with 2.
+    main_result = main(args.starting_folder, show_progress=args.progress)
+    sys.exit(main_result.return_code)
