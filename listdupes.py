@@ -390,10 +390,10 @@ if __name__ == "__main__":
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        write_output_as_csv(output_path, main_result)
+        write_output_as_csv(output_path, main_result.dupes)
     except Exception:  # Print data to stdout if file can't be written.
         handle_exception_at_write_time(sys.exc_info())
-        write_output_as_csv(sys.stdout.fileno(), main_result, open_mode="w")
+        write_output_as_csv(sys.stdout.fileno(), main_result.dupes, open_mode="w")
         sys.exit("The file couldn't be written.")
 
     sys.exit(main_result.return_code)
