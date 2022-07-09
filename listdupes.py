@@ -346,15 +346,6 @@ def main(starting_path, show_progress=False):
         "return_value_tuple", ["dupes", "error", "return_code"]
     )
 
-    # Determine the output's eventual file path.
-    output_file_name = "listdupes_output.csv"
-    output_path = pathlib.Path("~", output_file_name).expanduser()
-    try:
-        output_path = make_file_path_unique(output_path)
-    except FileExistsError:
-        error_text = "Your home folder has a lot of output files. Clean up to proceed."
-        return return_value_tuple({}, error_text, 1)
-
     # Gather all files except for those starting with a period.
     unexpanded_starting_path = pathlib.Path(starting_path)
     starting_path = unexpanded_starting_path.expanduser()
@@ -380,15 +371,6 @@ def main(starting_path, show_progress=False):
     # Sort the duplicates to prepare them for output.
     sort_dict_values(dupes)
 
-    # Format the duplicate paths as a CSV and write it to a file.
-    try:
-        write_output_as_csv(output_path, dupes)
-    except Exception:  # Print data to stdout if file can't be written.
-        handle_exception_at_write_time(sys.exc_info())
-        write_output_as_csv(sys.stdout.fileno(), dupes, open_mode="w")
-        error_text = "The file couldn't be written."
-        return return_value_tuple(dupes, error_text, 1)
-
     # Return successfully.
     return return_value_tuple(dupes, "", 0)
 
@@ -397,4 +379,21 @@ def main(starting_path, show_progress=False):
 if __name__ == "__main__":
     args = get_listdupes_args()  # The parser can exit with 2.
     main_result = main(args.starting_folder, show_progress=args.progress)
+
+    # Determine the output's eventual file path.
+    output_file_name = "listdupes_output.csv"
+    output_path = pathlib.Path("~", output_file_name).expanduser()
+    try:
+        output_path = make_file_path_unique(output_path)
+    except FileExistsError:
+        sys.exit("Your home folder has a lot of output files. Clean up to proceed.")
+
+    # Format the duplicate paths as a CSV and write it to a file.
+    try:
+        write_output_as_csv(output_path, main_result)
+    except Exception:  # Print data to stdout if file can't be written.
+        handle_exception_at_write_time(sys.exc_info())
+        write_output_as_csv(sys.stdout.fileno(), main_result, open_mode="w")
+        sys.exit("The file couldn't be written.")
+
     sys.exit(main_result.return_code)
