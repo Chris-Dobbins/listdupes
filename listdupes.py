@@ -375,7 +375,8 @@ def main(starting_path, show_progress=False):
     except Exception:  # Print data to stdout if file can't be written.
         handle_exception_at_write_time(sys.exc_info())
         write_output_as_csv(sys.stdout.fileno(), dupes, open_mode="w")
-        return return_value_tuple(dupes, "", 1)
+        error_text = "The file couldn't be written."
+        return return_value_tuple(dupes, error_text, 1)
 
     # Return successfully.
     return return_value_tuple(dupes, "", 0)
