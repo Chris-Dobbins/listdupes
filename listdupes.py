@@ -7,7 +7,7 @@ Writes its output to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
-__version__ = "Neutral"
+__version__ = "Internal"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
