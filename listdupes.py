@@ -361,34 +361,28 @@ def main(starting_path, show_progress=False):
         "main_return_tuple", ["dupes", "error_message", "return_code"]
     )
 
-    # Gather all files except for those starting with a period.
+    # Gather all files except those starting with "." and checksum them.
+    # Then compare the checksums and make a dict of duplicate files.
     unexpanded_starting_path = pathlib.Path(starting_path)
     starting_path = unexpanded_starting_path.expanduser()
     if show_progress:
         glob_module_arg = str(starting_path) + "/**/[!.]*"
         sub_paths = glob.glob(glob_module_arg, recursive=True)
+        checksum_result = checksum_paths_and_show_progress(sub_paths)
+        checksum_result.paths_and_sums.sort()
+        dupes = find_dupes_and_show_progress(checksum_result.paths_and_sums)
     else:
         sub_paths = starting_path.glob("**/[!.]*")
-
-    # Checksum the files.
-    if show_progress:
-        files_and_checksums = checksum_paths_and_show_progress(sub_paths)
-    else:
-        files_and_checksums = checksum_paths(sub_paths)
-
-    # Compare the checksums and make a dictionary of duplicate files.
-    files_and_checksums.paths_and_sums.sort()
-    if show_progress:
-        dupes = find_dupes_and_show_progress(files_and_checksums.paths_and_sums)
-    else:
-        dupes = find_dupes(files_and_checksums.paths_and_sums)
+        checksum_result = checksum_paths(sub_paths)
+        checksum_result.paths_and_sums.sort()
+        dupes = find_dupes(checksum_result.paths_and_sums)
 
     # Sort the duplicates to prepare them for output.
     sort_dict_values(dupes)
 
     # Determine return values and return.
-    if files_and_checksums.permission_errors:
-        permission_error_total = files_and_checksums.permission_errors
+    if checksum_result.permission_errors:
+        permission_error_total = checksum_result.permission_errors
         error_text = f"{permission_error_total} or more files couldn't be read."
         return_code = 1
     else:
