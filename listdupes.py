@@ -7,7 +7,7 @@ Writes its output to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
-__version__ = "5.0.0"
+__version__ = "Internal"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
@@ -168,10 +168,17 @@ def checksum_paths(collection_of_paths):
             pathlib.Path and its subclasses.
 
     Returns:
-        A list of tuples, each containing a file path and the checksum
-            of the corresponding file.
+        A named tuple with two items:
+            paths_and_sums: A list of tuples, each containing a file
+                path and the checksum of the corresponding file.
+            permission_errors: An Int showing the number of
+                permission errors suppressed.
     """
 
+    return_value_tuple = collections.namedtuple(
+        "checksum_paths_return_tuple", ["paths_and_sums", "permission_errors"]
+    )
+    permission_errors = 0
     paths_and_checksums = []
     for file_path in collection_of_paths:
         try:
@@ -179,8 +186,10 @@ def checksum_paths(collection_of_paths):
                 checksum = checksummer(file.read())
         except IsADirectoryError:
             continue  # Skip directories.
+        except PermissionError:
+            permission_errors += 1
         paths_and_checksums.append((file_path, checksum))
-    return paths_and_checksums
+    return return_value_tuple(paths_and_checksums, permission_errors)
 
 
 def checksum_paths_and_show_progress(collection_of_paths):
@@ -190,6 +199,10 @@ def checksum_paths_and_show_progress(collection_of_paths):
         text_before_counter="Checking file ",
         text_after_counter=" of {}.",
     )
+    return_value_tuple = collections.namedtuple(
+        "checksum_paths_return_tuple", ["paths_and_sums", "permission_errors"]
+    )
+    permission_errors = 0
     paths_and_checksums = []
     try:
         checksum_progress.print_text_for_counter()
@@ -199,11 +212,13 @@ def checksum_paths_and_show_progress(collection_of_paths):
                     checksum = checksummer(file.read())
             except IsADirectoryError:
                 continue  # Skip directories.
+            except PermissionError:
+                permission_errors += 1
             paths_and_checksums.append((file_path, checksum))
             checksum_progress.print_counter(index)
     finally:
         checksum_progress.end_count()
-    return paths_and_checksums
+    return return_value_tuple(paths_and_checksums, permission_errors)
 
 
 def find_dupes(paths_and_checksums):
@@ -343,7 +358,7 @@ def get_listdupes_args(overriding_args=None):
 def main(starting_path, show_progress=False):
     # Define return value.
     return_value_tuple = collections.namedtuple(
-        "return_value_tuple", ["dupes", "error", "return_code"]
+        "main_return_tuple", ["dupes", "error_message", "return_code"]
     )
 
     # Gather all files except for those starting with a period.
@@ -362,17 +377,24 @@ def main(starting_path, show_progress=False):
         files_and_checksums = checksum_paths(sub_paths)
 
     # Compare the checksums and make a dictionary of duplicate files.
-    files_and_checksums.sort()
+    files_and_checksums.paths_and_sums.sort()
     if show_progress:
-        dupes = find_dupes_and_show_progress(files_and_checksums)
+        dupes = find_dupes_and_show_progress(files_and_checksums.paths_and_sums)
     else:
-        dupes = find_dupes(files_and_checksums)
+        dupes = find_dupes(files_and_checksums.paths_and_sums)
 
     # Sort the duplicates to prepare them for output.
     sort_dict_values(dupes)
 
-    # Return successfully.
-    return return_value_tuple(dupes, "", 0)
+    # Determine return values and return.
+    if files_and_checksums.permission_errors:
+        permission_error_total = files_and_checksums.permission_errors
+        error_text = f"{permission_error_total} or more files couldn't be read."
+        return_code = 1
+    else:
+        error_text = ""
+        return_code = 0
+    return return_value_tuple(dupes, error_text, return_code)
 
 
 # Run the app!
@@ -396,4 +418,6 @@ if __name__ == "__main__":
         write_output_as_csv(sys.stdout.fileno(), main_result.dupes, open_mode="w")
         sys.exit("The file couldn't be written.")
 
+    if main_result.error_message:
+        print(main_result.error_message, file=sys.stderr)
     sys.exit(main_result.return_code)
