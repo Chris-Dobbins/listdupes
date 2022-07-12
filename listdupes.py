@@ -109,14 +109,14 @@ class ProgressCounter(Cursor):
         """Provide context about a counter by printing text after it.
 
         Prints the value of text_after_counter provided to the class's
-        constructor (Defaults to printing no text). If the str provides
-        a replacement field the total number of the counter will be
-        inserted there.
+        constructor (Defaults to printing no text). If the string
+        provides a replacement field the total number of the counter
+        will be inserted there.
         Example text: ' of {}.'
 
         Positional Args:
-            starting_column_for_cursor: An int which determines at which
-                column the text starts printing
+            starting_column_for_cursor: An integer which determines
+                at which column the text starts printing.
         """
 
         formatted_text = self.text_after_counter.format(self.total_to_be_counted)
@@ -137,7 +137,7 @@ class ProgressCounter(Cursor):
 
 # Functions
 def make_file_path_unique(path):
-    """Makes a similarly named Path object if a path already exists.
+    """Makes a similarly named path object if a path already exists.
 
     Positional Args:
         path: An instance of pathlib.Path or its subclasses.
@@ -146,7 +146,7 @@ def make_file_path_unique(path):
         FileExistsError after 255 attempts to determine a unique path.
 
     Returns:
-        The value of path, or another Path object with a similar name.
+        The value of path, or another path object with a similar name.
     """
 
     new_path = None
@@ -168,11 +168,11 @@ def checksum_paths(collection_of_paths):
             pathlib.Path and its subclasses.
 
     Returns:
-        A named tuple with two items:
-            paths_and_sums: A list of tuples, each containing a file
-                path and the checksum of the corresponding file.
-            permission_errors: An Int showing the number of
-                permission errors suppressed.
+        A named tuple (paths_and_sums, permission_errors), where
+            paths_and_sums is a list of tuples which contain a file
+            path and the checksum integer of the corresponding file,
+            and permission_errors is an integer representing
+            the number of permission errors suppressed.
     """
 
     return_value_tuple = collections.namedtuple(
@@ -229,8 +229,9 @@ def find_dupes(paths_and_checksums):
             path and the checksum of the corresponding file.
 
     Returns:
-        A dictionary of paths mapped to sets of any other paths whose
-            checksums match the first.
+        A dictionary of paths mapped to sets of paths whose associated
+            checksums match the checksum associated with the path key.
+            The dictionary never contains a path more than once.
     """
 
     dupes = collections.defaultdict(set)
@@ -356,6 +357,24 @@ def get_listdupes_args(overriding_args=None):
 
 
 def main(starting_path, show_progress=False):
+    """Checks a path and its subfolders for duplicate files.
+
+    Positional Args:
+        starting_path: A string of the path to recursively search for
+            duplicate files.
+
+    Optional Args:
+        show_progress: A bool indicating whether to display the progress
+            of the checksumming and comparison processes.
+
+    Returns:
+        A named tuple (dupes, error_message, return_code), where dupes
+            is a dictionary (As the return value of find_dupes but with
+            its sets replaced by lists), error_message is a string which
+            describes an error or is empty if the return code is 0,
+            and return_code is an integer corresponding to the error.
+    """
+
     # Define return value.
     return_value_tuple = collections.namedtuple(
         "main_return_tuple", ["dupes", "error_message", "return_code"]
