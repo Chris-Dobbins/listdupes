@@ -382,13 +382,12 @@ def main(starting_path, show_progress=False):
 
     # Determine return values and return.
     if checksum_result.permission_errors:
-        permission_error_total = checksum_result.permission_errors
-        error_text = f"{permission_error_total} or more files couldn't be read."
+        error = f"{checksum_result.permission_errors} or more files couldn't be read."
         return_code = 1
     else:
-        error_text = ""
+        error = ""
         return_code = 0
-    return return_value_tuple(dupes, error_text, return_code)
+    return return_value_tuple(dupes, error, return_code)
 
 
 # Run the app!
