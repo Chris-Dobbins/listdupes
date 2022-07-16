@@ -45,18 +45,18 @@ class ProgressCounter(Cursor):
 
     def __init__(
         self,
-        total_to_be_counted,
+        collection_to_count,
         text_before_counter="",
         text_after_counter="",
         output=sys.stderr,
     ):
-        self.total_to_be_counted = total_to_be_counted
+        self.collection_to_count = collection_to_count
         self.text_before_counter = text_before_counter
         self.text_after_counter = text_after_counter
         self.output = output
 
-        # TODO: Address length_of_total only being foolproof if total comes from len().
-        self.length_of_total = len(str(total_to_be_counted))
+        self.total_to_be_counted = len(self.collection_to_count)
+        self.length_of_total = len(str(self.total_to_be_counted))
         self.length_of_text_before_counter = len(self.text_before_counter)
         self.length_of_text_after_counter = len(self.text_after_counter)
         self.start_of_counter = self.length_of_text_before_counter + 1
@@ -195,7 +195,7 @@ def checksum_paths(collection_of_paths):
 def checksum_paths_and_show_progress(collection_of_paths):
     """As checksum_paths but prints the loop's progress to terminal."""
     checksum_progress = ProgressCounter(
-        len(collection_of_paths),
+        collection_of_paths,
         text_before_counter="Checking file ",
         text_after_counter=" of {}.",
     )
@@ -248,7 +248,7 @@ def find_dupes(paths_and_checksums):
 def find_dupes_and_show_progress(paths_and_checksums):
     """As find_dupes but prints the loop's progress to terminal."""
     comparisons_progress = ProgressCounter(
-        len(paths_and_checksums),
+        paths_and_checksums,
         text_before_counter="Comparing file ",
         text_after_counter=" of {}.",
     )
