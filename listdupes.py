@@ -169,10 +169,10 @@ def checksum_paths(collection_of_paths):
 
     Returns:
         A named tuple (paths_and_sums, permission_errors), where
-            paths_and_sums is a list of tuples which contain a file
-            path and the checksum integer of the corresponding file,
-            and permission_errors is an integer representing
-            the number of permission errors suppressed.
+        paths_and_sums is a list of tuples which contain a file path
+        and the checksum integer of the corresponding file, and
+        permission_errors is an integer representing the number of
+        permission errors suppressed.
     """
 
     return_value_tuple = collections.namedtuple(
@@ -230,8 +230,8 @@ def find_dupes(paths_and_checksums):
 
     Returns:
         A dictionary of paths mapped to sets of paths whose associated
-            checksums match the checksum associated with the path key.
-            The dictionary never contains a path more than once.
+        checksums match the checksum associated with the path key.
+        The dictionary never contains a path more than once.
     """
 
     dupes = collections.defaultdict(set)
@@ -421,10 +421,10 @@ def main(starting_path, show_progress=False):
 
     Returns:
         A named tuple (dupes, error_message, return_code), where dupes
-            is a dictionary (As the return value of find_dupes but with
-            its sets replaced by lists), error_message is a string which
-            describes an error or is empty if the return code is 0,
-            and return_code is an integer corresponding to the error.
+        is a dictionary (As the return value of find_dupes but with
+        its sets replaced by lists), error_message is a string which
+        describes an error or is empty if the return code is 0,
+        and return_code is an integer corresponding to the error.
     """
 
     # Define return value.
