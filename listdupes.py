@@ -324,7 +324,10 @@ def write_dupes_to_csv(
         **kwargs: Passed to the open function.
     """
 
-    with open(output_file, mode=mode, **kwargs) as csv_file:
+    # with open(output_file, mode=mode, **kwargs) as csv_file:
+    with open(
+        output_file, encoding=encoding, mode=mode, errors=errors, **kwargs
+    ) as csv_file:
         writer = csv.writer(csv_file)
         if labels:
             writer.writerow(labels)
