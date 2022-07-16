@@ -300,27 +300,21 @@ def process_stdin_and_stream_results(csv_labels):
     for index, line in enumerate(sys.stdin):
         main_result = main(line.rstrip(), show_progress=args.progress)
         csv_labels_arg = [] if index > 0 else csv_labels
-        write_dupes_as_csv(  # The fd is kept open so writes append.
+        write_dupes_to_csv(  # The fd is kept open so writes append.
             sys.stdout.fileno(), main_result.dupes, csv_labels_arg, closefd=False
         )
         return_codes.append(main_result.return_code)
     return return_codes
 
 
-def write_dupes_as_csv(
-    output_file,
-    dictionary,
-    labels,
-    encoding="utf-8",
-    errors="replace",
-    mode="x",
-    **kwargs,
+def write_dupes_to_csv(
+    output_file, dupes, labels, encoding="utf-8", errors="replace", mode="x", **kwargs
 ):
     """Writes out the contents of a dict as an Excel style CSV.
 
     Args:
         output_file: A path-like object or an integer file description.
-        dictionary: The dict to be written to the output_file.
+        dupes: The dict of duplicates to be written to the output_file.
         labels: A iterable of strings or numbers which are written
             once as the first row of the file. To omit the label row
             pass []. To print a blank row pass ['', ''].
@@ -335,7 +329,7 @@ def write_dupes_as_csv(
         if labels:
             writer.writerow(labels)
 
-        for file, duplicates_list in dictionary.items():
+        for file, duplicates_list in dupes.items():
             writer.writerow([file, duplicates_list[0]])
             if len(duplicates_list) > 1:
                 for duplicate in duplicates_list[1:]:
@@ -489,10 +483,10 @@ if __name__ == "__main__":
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        write_dupes_as_csv(output_path, main_result.dupes, column_labels)
+        write_dupes_to_csv(output_path, main_result.dupes, column_labels)
     except Exception:  # Print data to stdout if file can't be written.
         handle_exception_at_write_time(sys.exc_info())
-        write_dupes_as_csv(sys.stdout.fileno(), main_result.dupes, column_labels)
+        write_dupes_to_csv(sys.stdout.fileno(), main_result.dupes, column_labels)
         sys.exit("The file couldn't be written.")
 
     if main_result.error_message:
