@@ -284,11 +284,55 @@ def sort_dict_values(dictionary, sort_key=None):
         dictionary[dict_key] = list_of_values
 
 
-def write_output_as_csv(output_file, dictionary, open_mode="x"):
-    """Writes out the contents of a dict as an Excel style CSV."""
-    with open(output_file, mode=open_mode, errors="replace") as csv_file:
+def process_stdin_and_stream_results(csv_labels):
+    """Run main on paths streamed to stdin and stream the csv to stdout.
+
+    Positional Args:
+        csv_labels: A iterable of strings or numbers which are written
+            once as the first row of the file. To omit the label row
+            pass []. To print a blank row pass ['', ''].
+
+    Returns:
+        A list of all return codes produced by the calls to main.
+    """
+
+    return_codes = []
+    for index, line in enumerate(sys.stdin):
+        main_result = main(line.rstrip(), show_progress=args.progress)
+        csv_labels_arg = [] if index > 0 else csv_labels
+        write_dupes_as_csv(  # The fd is kept open so writes append.
+            sys.stdout.fileno(), main_result.dupes, csv_labels_arg, closefd=False
+        )
+        return_codes.append(main_result.return_code)
+    return return_codes
+
+
+def write_dupes_as_csv(
+    output_file,
+    dictionary,
+    labels,
+    encoding="utf-8",
+    errors="replace",
+    mode="x",
+    **kwargs,
+):
+    """Writes out the contents of a dict as an Excel style CSV.
+
+    Positional Args:
+        output_file: A path-like object or an integer file description.
+        dictionary: The dict to be written to the output_file.
+        labels: A iterable of strings or numbers which are written
+            once as the first row of the file. To omit the label row
+            pass []. To print a blank row pass ['', ''].
+
+    Optional Args:
+        All keyword arguments are passed to the open function.
+    """
+
+    with open(output_file, mode=mode, **kwargs) as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerow(["File", "Duplicates"])  # Column labelling row.
+        if labels:
+            writer.writerow(labels)
 
         for file, duplicates_list in dictionary.items():
             writer.writerow([file, duplicates_list[0]])
@@ -344,7 +388,19 @@ def get_listdupes_args(overriding_args=None):
     )
     parser.add_argument(
         "starting_folder",
+        nargs="?",
         help="Accepts a single path from the terminal.",
+    )
+    parser.add_argument(
+        "-f",
+        "--filter",
+        action="store_true",
+        help=(
+            "Accept starting paths from stdin and output results to stdout."
+            "  Note that this may not be what you want, as it will"
+            " list duplicates contained within each starting path,"
+            " not across multiple starting paths."
+        ),
     )
     parser.add_argument(
         "-p",
@@ -380,6 +436,10 @@ def main(starting_path, show_progress=False):
         "main_return_tuple", ["dupes", "error_message", "return_code"]
     )
 
+    # Return early if starting_path is not provided.
+    if starting_path == None:
+        return return_value_tuple({}, "No starting folder was provided.", 1)
+
     # Gather all files except those starting with "." and checksum them.
     # Then compare the checksums and make a dict of duplicate files.
     unexpanded_starting_path = pathlib.Path(starting_path)
@@ -412,6 +472,12 @@ def main(starting_path, show_progress=False):
 # Run the app!
 if __name__ == "__main__":
     args = get_listdupes_args()  # The parser can exit with 2.
+    column_labels = ["File", "Duplicates"]
+
+    if args.filter:
+        main_return_codes = process_stdin_and_stream_results(column_labels)
+        sys.exit(3 if any(main_return_codes) else 0)
+
     main_result = main(args.starting_folder, show_progress=args.progress)
 
     # Determine the output's eventual file path.
@@ -424,10 +490,10 @@ if __name__ == "__main__":
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        write_output_as_csv(output_path, main_result.dupes)
+        write_dupes_as_csv(output_path, main_result.dupes, column_labels)
     except Exception:  # Print data to stdout if file can't be written.
         handle_exception_at_write_time(sys.exc_info())
-        write_output_as_csv(sys.stdout.fileno(), main_result.dupes, open_mode="w")
+        write_dupes_as_csv(sys.stdout.fileno(), main_result.dupes, column_labels)
         sys.exit("The file couldn't be written.")
 
     if main_result.error_message:
