@@ -114,7 +114,7 @@ class ProgressCounter(Cursor):
         will be inserted there.
         Example text: ' of {}.'
 
-        Positional Args:
+        Args:
             starting_column_for_cursor: An integer which determines
                 at which column the text starts printing.
         """
@@ -139,7 +139,7 @@ class ProgressCounter(Cursor):
 def make_file_path_unique(path):
     """Makes a similarly named path object if a path already exists.
 
-    Positional Args:
+    Args:
         path: An instance of pathlib.Path or its subclasses.
 
     Raises:
@@ -163,7 +163,7 @@ def make_file_path_unique(path):
 def checksum_paths(collection_of_paths):
     """Checksums files and stores their checksums alongside their paths.
 
-    Positional Args:
+    Args:
         collection_of_paths: A collection of strings, or instances of
             pathlib.Path and its subclasses.
 
@@ -224,7 +224,7 @@ def checksum_paths_and_show_progress(collection_of_paths):
 def find_dupes(paths_and_checksums):
     """Finds duplicate files by comparing their checksums.
 
-    Positional Args:
+    Args:
         paths_and_checksums: A list of tuples, each containing a file
             path and the checksum of the corresponding file.
 
@@ -287,7 +287,7 @@ def sort_dict_values(dictionary, sort_key=None):
 def process_stdin_and_stream_results(csv_labels):
     """Run main on paths streamed to stdin and stream the csv to stdout.
 
-    Positional Args:
+    Args:
         csv_labels: A iterable of strings or numbers which are written
             once as the first row of the file. To omit the label row
             pass []. To print a blank row pass ['', ''].
@@ -318,15 +318,16 @@ def write_dupes_as_csv(
 ):
     """Writes out the contents of a dict as an Excel style CSV.
 
-    Positional Args:
+    Args:
         output_file: A path-like object or an integer file description.
         dictionary: The dict to be written to the output_file.
         labels: A iterable of strings or numbers which are written
             once as the first row of the file. To omit the label row
             pass []. To print a blank row pass ['', ''].
-
-    Optional Args:
-        All keyword arguments are passed to the open function.
+        encoding: Passed to the open function. Defaults to 'utf-8'.
+        errors: Passed to the open function. Defaults to 'replace'.
+        mode: Passed to the open function. Defaults to 'x'.
+        **kwargs: Passed to the open function.
     """
 
     with open(output_file, mode=mode, **kwargs) as csv_file:
@@ -364,11 +365,11 @@ def get_listdupes_args(overriding_args=None):
     the result of parsing that argument.
     E.g. args.progress contains the value of the --progress argument.
 
-    Optional Args:
+    Args:
         overriding_args: Accepts a list of strings to parse.
             This is passed to the parser's parse_args() method.
-            When the value is None parse_args() defaults
-            to taking its arguments from sys.argv.
+            When the value is None (As it is by default) parse_args()
+            taking its arguments from sys.argv.
 
     Returns:
         An argparse.Namespace object with the app's arguments.
@@ -415,13 +416,11 @@ def get_listdupes_args(overriding_args=None):
 def main(starting_path, show_progress=False):
     """Checks a path and its subfolders for duplicate files.
 
-    Positional Args:
+    Args:
         starting_path: A string of the path to recursively search for
             duplicate files.
-
-    Optional Args:
         show_progress: A bool indicating whether to display the progress
-            of the checksumming and comparison processes.
+            of checksumming and comparison processes. Defaults to False.
 
     Returns:
         A named tuple (dupes, error_message, return_code), where dupes
