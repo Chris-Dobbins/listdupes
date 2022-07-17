@@ -133,3 +133,6 @@ dmypy.json
 
 # Nova
 .nova/
+
+# flake8
+.flake8
