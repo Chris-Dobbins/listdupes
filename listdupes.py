@@ -433,7 +433,7 @@ def main(starting_path, show_progress=False):
     )
 
     # Return early if starting_path is not provided.
-    if starting_path == None:
+    if starting_path is None:
         return return_value_tuple({}, "No starting folder was provided.", 1)
 
     # Gather all files except those starting with "." and checksum them.
