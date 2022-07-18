@@ -286,6 +286,14 @@ def sort_dict_values(dictionary, sort_key=None):
         dictionary[dict_key] = list_of_values
 
 
+def sum_length_of_dict_values(dictionary):
+    """Sum the lengths of all a dict's values and return the sum"""
+    sum_total_length = 0
+    for dict_value in dictionary.values():
+        sum_total_length += len(dict_value)
+    return sum_total_length
+
+
 def process_stdin_and_stream_results(csv_labels):
     """Run main on paths streamed to stdin and stream the csv to stdout.
 
@@ -457,6 +465,13 @@ def main(starting_path, show_progress=False):
     # Sort the duplicates to prepare them for output.
     sort_dict_values(dupes)
 
+    # Prepare to write description of result.
+    total = sum_length_of_dict_values(dupes)
+    plural = total > 1
+    duplicate_s_ = "duplicates" if plural else "duplicate"
+    were_or_was = "were" if plural else "was"
+    description_of_the_result = f"{total} {duplicate_s_} {were_or_was}"
+
     # Determine return values and return.
     if checksum_result.permission_errors and not dupes:
         description = (
@@ -465,15 +480,15 @@ def main(starting_path, show_progress=False):
         return_code = 1
     elif checksum_result.permission_errors and dupes:
         description = (
-            "1 or more duplicates were found, however"
+            f"{description_of_the_result} found, however"
             f" {checksum_result.permission_errors} or more files couldn't be read."
         )
         return_code = 1
     elif not dupes:
-        description = "No duplicate files were found."
+        description = "No duplicates were found."
         return_code = 0
     else:
-        description = "One or more duplicate files were found."
+        description = f"{description_of_the_result} found."
         return_code = 0
     return return_value_tuple(dupes, description, return_code)
 
