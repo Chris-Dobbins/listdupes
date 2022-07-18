@@ -188,6 +188,7 @@ def checksum_paths(collection_of_paths):
             continue  # Skip directories.
         except PermissionError:
             permission_errors += 1
+            continue
         paths_and_checksums.append((file_path, checksum))
     return return_value_tuple(paths_and_checksums, permission_errors)
 
@@ -214,6 +215,7 @@ def checksum_paths_and_show_progress(collection_of_paths):
                 continue  # Skip directories.
             except PermissionError:
                 permission_errors += 1
+                continue
             paths_and_checksums.append((file_path, checksum))
             checksum_progress.print_counter(index)
     finally:
