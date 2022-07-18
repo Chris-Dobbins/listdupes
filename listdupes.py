@@ -487,8 +487,11 @@ if __name__ == "__main__":
         main_return_codes = process_stdin_and_stream_results(column_labels)
         sys.exit(3 if any(main_return_codes) else 0)
 
+    # Call main, print errors, and exit early if there are no results.
     main_result = main(args.starting_folder, show_progress=args.progress)
     print(main_result.description, file=sys.stderr)
+    if not main_result.dupes:
+        sys.exit(main_result.return_code)
 
     # Determine the output's eventual file path.
     output_file_name = "listdupes_output.csv"
