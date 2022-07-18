@@ -507,5 +507,6 @@ if __name__ == "__main__":
     except Exception:  # Print data to stdout if file can't be written.
         handle_exception_at_write_time(sys.exc_info())
         write_dupes_to_csv(sys.stdout.fileno(), main_result.dupes, column_labels)
+        sys.exit(1)
 
     sys.exit(main_result.return_code)
