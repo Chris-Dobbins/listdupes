@@ -422,16 +422,16 @@ def main(starting_path, show_progress=False):
             of checksumming and comparison processes. Defaults to False.
 
     Returns:
-        A named tuple (dupes, error_message, return_code), where dupes
+        A named tuple (dupes, description, return_code), where dupes
         is a dictionary (As the return value of find_dupes but with
-        its sets replaced by lists), error_message is a string which
-        describes an error or is empty if the return code is 0,
-        and return_code is an integer corresponding to the error.
+        its sets replaced by lists), description is a string which
+        describes the result, and return_code is an integer
+        corresponding to the error.
     """
 
     # Define return value.
     return_value_tuple = collections.namedtuple(
-        "main_return_tuple", ["dupes", "error_message", "return_code"]
+        "main_return_tuple", ["dupes", "description", "return_code"]
     )
 
     # Return early if starting_path is not provided.
@@ -458,13 +458,24 @@ def main(starting_path, show_progress=False):
     sort_dict_values(dupes)
 
     # Determine return values and return.
-    if checksum_result.permission_errors:
-        error = f"{checksum_result.permission_errors} or more files couldn't be read."
+    if checksum_result.permission_errors and not dupes:
+        description = (
+            f"{checksum_result.permission_errors} or more files couldn't be read."
+        )
         return_code = 1
-    else:
-        error = ""
+    elif checksum_result.permission_errors and dupes:
+        description = (
+            "1 or more duplicates were found, however"
+            f" {checksum_result.permission_errors} or more files couldn't be read."
+        )
+        return_code = 1
+    elif not dupes:
+        description = "No duplicate files were found."
         return_code = 0
-    return return_value_tuple(dupes, error, return_code)
+    else:
+        description = "One or more duplicate files were found."
+        return_code = 0
+    return return_value_tuple(dupes, description, return_code)
 
 
 # Run the app!
@@ -477,6 +488,7 @@ if __name__ == "__main__":
         sys.exit(3 if any(main_return_codes) else 0)
 
     main_result = main(args.starting_folder, show_progress=args.progress)
+    print(main_result.description, file=sys.stderr)
 
     # Determine the output's eventual file path.
     output_file_name = "listdupes_output.csv"
@@ -492,8 +504,5 @@ if __name__ == "__main__":
     except Exception:  # Print data to stdout if file can't be written.
         handle_exception_at_write_time(sys.exc_info())
         write_dupes_to_csv(sys.stdout.fileno(), main_result.dupes, column_labels)
-        sys.exit("The file couldn't be written.")
 
-    if main_result.error_message:
-        print(main_result.error_message, file=sys.stderr)
     sys.exit(main_result.return_code)
