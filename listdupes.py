@@ -491,12 +491,14 @@ def main(starting_path, show_progress=False):
     unexpanded_starting_path = pathlib.Path(starting_path)
     starting_path = unexpanded_starting_path.expanduser()
     if show_progress:
+        print("Gathering files...", file=sys.stderr)
         glob_module_arg = str(starting_path) + "/**/[!.]*"
         sub_paths = glob.glob(glob_module_arg, recursive=True)
         checksum_result = checksum_paths_and_show_progress(sub_paths)
         checksum_result.paths_and_sums.sort()
         dupes = find_dupes_and_show_progress(checksum_result.paths_and_sums)
     else:
+        print("Gathering files...", file=sys.stderr)
         sub_paths = starting_path.glob("**/[!.]*")
         checksum_result = checksum_paths(sub_paths)
         checksum_result.paths_and_sums.sort()
@@ -527,6 +529,7 @@ if __name__ == "__main__":
     # Determine the output's eventual file path.
     output_file_name = "listdupes_output.csv"
     output_path = pathlib.Path("~", output_file_name).expanduser()
+    home_folder = output_path.parent
     try:
         output_path = make_file_path_unique(output_path)
     except FileExistsError:
@@ -535,6 +538,9 @@ if __name__ == "__main__":
     # Format the duplicate paths as a CSV and write it to a file.
     try:
         write_dupes_to_csv(output_path, main_result.dupes, column_labels)
+        print(
+            f"The list of duplicates has been saved to {home_folder}.", file=sys.stderr
+        )
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
