@@ -286,6 +286,46 @@ def sort_dict_values(dictionary, sort_key=None):
         dictionary[dict_key] = list_of_values
 
 
+def create_return_values(dictionary, checksum_result):
+    """Create values to pass to main's return_value_tuple constructor.
+
+    Args:
+        dictionary: A dict returned by a find_dupes function.
+        checksum_result: A tuple returned by a checksum_paths function.
+
+    Returns:
+        An unnamed tuple suitable to be passed to the return_value_tuple
+        named tuple constructor. See main's docstring for more info.
+    """
+
+    # Prepare to create description value.
+    total_errors = checksum_result.permission_errors
+    total = sum_length_of_dict_values(dictionary)
+    plural = total > 1
+    duplicate_s_ = "duplicates" if plural else "duplicate"
+    were_or_was = "were" if plural else "was"
+    description_of_the_result = f"{total} {duplicate_s_} {were_or_was}"
+
+    # Determine what values to return.
+    if checksum_result.permission_errors and not dictionary:
+        description = f"{total_errors} or more files couldn't be read."
+        return_code = 1
+    elif checksum_result.permission_errors and dictionary:
+        description = (
+            f"{description_of_the_result} found, however"
+            f" {total_errors} or more files couldn't be read."
+        )
+        return_code = 1
+    elif not dictionary:
+        description = "No duplicates were found."
+        return_code = 0
+    else:
+        description = f"{description_of_the_result} found."
+        return_code = 0
+
+    return (dictionary, description, return_code)
+
+
 def sum_length_of_dict_values(dictionary):
     """Sum the lengths of all a dict's values and return the sum"""
     sum_total_length = 0
@@ -465,32 +505,8 @@ def main(starting_path, show_progress=False):
     # Sort the duplicates to prepare them for output.
     sort_dict_values(dupes)
 
-    # Prepare to write description of result.
-    total = sum_length_of_dict_values(dupes)
-    plural = total > 1
-    duplicate_s_ = "duplicates" if plural else "duplicate"
-    were_or_was = "were" if plural else "was"
-    description_of_the_result = f"{total} {duplicate_s_} {were_or_was}"
-
-    # Determine return values and return.
-    if checksum_result.permission_errors and not dupes:
-        description = (
-            f"{checksum_result.permission_errors} or more files couldn't be read."
-        )
-        return_code = 1
-    elif checksum_result.permission_errors and dupes:
-        description = (
-            f"{description_of_the_result} found, however"
-            f" {checksum_result.permission_errors} or more files couldn't be read."
-        )
-        return_code = 1
-    elif not dupes:
-        description = "No duplicates were found."
-        return_code = 0
-    else:
-        description = f"{description_of_the_result} found."
-        return_code = 0
-    return return_value_tuple(dupes, description, return_code)
+    return_values = create_return_values(dupes, checksum_result)
+    return return_value_tuple(*return_values)
 
 
 # Run the app!
