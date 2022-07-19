@@ -180,7 +180,7 @@ def checksum_paths(collection_of_paths):
         permission errors suppressed.
     """
 
-    return_value_tuple = collections.namedtuple(
+    result_tuple = collections.namedtuple(
         "checksum_paths_return_tuple", ["paths_and_sums", "permission_errors"]
     )
     permission_errors = 0
@@ -195,7 +195,7 @@ def checksum_paths(collection_of_paths):
             permission_errors += 1
             continue
         paths_and_checksums.append((file_path, checksum))
-    return return_value_tuple(paths_and_checksums, permission_errors)
+    return result_tuple(paths_and_checksums, permission_errors)
 
 
 def checksum_paths_and_show_progress(collection_of_paths):
@@ -205,7 +205,8 @@ def checksum_paths_and_show_progress(collection_of_paths):
         text_before_counter="Checking file ",
         text_after_counter=" of {}.",
     )
-    return_value_tuple = collections.namedtuple(
+
+    result_tuple = collections.namedtuple(
         "checksum_paths_return_tuple", ["paths_and_sums", "permission_errors"]
     )
     permission_errors = 0
@@ -225,7 +226,7 @@ def checksum_paths_and_show_progress(collection_of_paths):
             checksum_progress.print_counter(index)
     finally:
         checksum_progress.end_count()
-    return return_value_tuple(paths_and_checksums, permission_errors)
+    return result_tuple(paths_and_checksums, permission_errors)
 
 
 def locate_dupes(paths_and_checksums):
@@ -259,6 +260,7 @@ def locate_dupes_and_show_progress(paths_and_checksums):
         text_before_counter="Comparing file ",
         text_after_counter=" of {}.",
     )
+
     dupes = collections.defaultdict(set)
     try:
         comparisons_progress.print_text_for_counter()
@@ -291,16 +293,17 @@ def sort_dict_values(dictionary, sort_key=None):
         dictionary[dict_key] = list_of_values
 
 
-def create_return_values(dictionary, checksum_result):
-    """Create values to pass to search_for_dupes' return_value_tuple constructor.
+def create_search_return_values(dictionary, checksum_result):
+    """Create values to pass to search_for_dupes' return tuple.
 
     Args:
         dictionary: A dict returned by a locate_dupes function.
         checksum_result: A tuple returned by a checksum_paths function.
 
     Returns:
-        An unnamed tuple suitable to be passed to the return_value_tuple
-        named tuple constructor. See search_for_dupes' docstring for more info.
+        An unnamed tuple suitable which can be unpacked into the
+        search_for_dupes_return_tuple constructor. See search_for_dupes'
+        docstring for more info.
     """
 
     # Prepare to create description value.
@@ -339,8 +342,8 @@ def sum_length_of_dict_values(dictionary):
     return sum_total_length
 
 
-def process_stdin_and_stream_results(csv_labels):
-    """Run search_for_dupes on paths streamed to stdin and stream the csv to stdout.
+def search_stdin_and_stream_results(csv_labels):
+    """Search paths from stdin for dupes and stream results to stdout.
 
     Args:
         csv_labels: A iterable of strings or numbers which are written
@@ -348,7 +351,7 @@ def process_stdin_and_stream_results(csv_labels):
             pass []. To print a blank row pass ['', ''].
 
     Returns:
-        A list of all return codes produced by the calls to search_for_dupes.
+        A list of return codes produced by the search_for_dupes calls.
     """
 
     return_codes = []
@@ -482,14 +485,13 @@ def search_for_dupes(starting_path, show_progress=False):
         corresponding to the error.
     """
 
-    # Define return value.
-    return_value_tuple = collections.namedtuple(
+    result_tuple = collections.namedtuple(
         "search_for_dupes_return_tuple", ["dupes", "description", "return_code"]
     )
 
     # Return early if starting_path is not provided.
     if starting_path is None:
-        return return_value_tuple({}, "No starting folder was provided.", 1)
+        return result_tuple({}, "No starting folder was provided.", 1)
 
     # Gather all files except those starting with "." and checksum them.
     # Then compare the checksums and make a dict of duplicate files.
@@ -512,13 +514,12 @@ def search_for_dupes(starting_path, show_progress=False):
     # Sort the duplicates to prepare them for output.
     sort_dict_values(dupes)
 
-    return_values = create_return_values(dupes, checksum_result)
-    return return_value_tuple(*return_values)
+    return_values = create_search_return_values(dupes, checksum_result)
+    return result_tuple(*return_values)
 
 
 def main(args):
     """The functionality of the listdupes command-line app."""
-    # Define return value.
     result_tuple = collections.namedtuple(
         "main_return_tuple", ["final_message", "return_code"]
     )
@@ -526,7 +527,7 @@ def main(args):
     column_labels = ["File", "Duplicates"]
 
     if args.filter:
-        return_codes_from_search = process_stdin_and_stream_results(column_labels)
+        return_codes_from_search = search_stdin_and_stream_results(column_labels)
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
     # Call search_for_dupes, print its description, and return early if
