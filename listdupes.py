@@ -505,7 +505,6 @@ def search_for_dupes(starting_path, show_progress=False):
         checksum_result.paths_and_sums.sort()
         dupes = locate_dupes_and_show_progress(checksum_result.paths_and_sums)
     else:
-        print("Gathering files...", file=sys.stderr)
         sub_paths = starting_path.glob("**/[!.]*")
         checksum_result = checksum_paths(sub_paths)
         checksum_result.paths_and_sums.sort()
@@ -527,6 +526,8 @@ def main(args):
     column_labels = ["File", "Duplicates"]
 
     if args.filter:
+        if args.progress:
+            print("Processing input stream...", file=sys.stderr)
         return_codes_from_search = search_stdin_and_stream_results(column_labels)
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
