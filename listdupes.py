@@ -523,6 +523,19 @@ def main(args):
         "main_return_tuple", ["final_message", "return_code"]
     )
 
+    # Determine the output's eventual file path.
+    # NOTE: This is done as early as possible to allow for an early exit
+    # if we can't write to a drive.
+    output_file_name = "listdupes_output.csv"
+    output_path = pathlib.Path("~", output_file_name).expanduser()
+    try:
+        output_path = make_file_path_unique(output_path)
+    except FileExistsError:
+        return result_tuple(
+            "Your home folder has a lot of output files. Clean up to proceed.",
+            1,
+        )
+
     column_labels = ["File", "Duplicates"]
 
     if args.filter:
@@ -537,17 +550,6 @@ def main(args):
     print(search_result.description, file=sys.stderr)
     if not search_result.dupes:
         return result_tuple("", search_result.return_code)
-
-    # Determine the output's eventual file path.
-    output_file_name = "listdupes_output.csv"
-    output_path = pathlib.Path("~", output_file_name).expanduser()
-    try:
-        output_path = make_file_path_unique(output_path)
-    except FileExistsError:
-        return result_tuple(
-            "Your home folder has a lot of output files. Clean up to proceed.",
-            1,
-        )
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
