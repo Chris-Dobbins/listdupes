@@ -451,10 +451,10 @@ def get_listdupes_args(overriding_args=None):
         "--filter",
         action="store_true",
         help=(
-            "Accept starting paths from stdin and output results to stdout."
+            "Accept starting folder paths from stdin and output results to stdout."
             "  Note that this may not be what you want, as it will"
-            " list duplicates contained within each starting path,"
-            " not across multiple starting paths."
+            " list duplicates contained within each starting folder,"
+            " not across multiple starting folders."
         ),
     )
     parser.add_argument(
@@ -467,11 +467,11 @@ def get_listdupes_args(overriding_args=None):
     return args
 
 
-def search_for_dupes(starting_path, show_progress=False):
+def search_for_dupes(starting_folder, show_progress=False):
     """Searches a path and its subfolders for duplicate files.
 
     Args:
-        starting_path: A string of the path to recursively search for
+        starting_folder: A string of the path to recursively search for
             duplicate files.
         show_progress: A bool indicating whether to display the progress
             of checksumming and comparison processes. Defaults to False.
@@ -488,23 +488,23 @@ def search_for_dupes(starting_path, show_progress=False):
         "search_for_dupes_return_tuple", ["dupes", "description", "return_code"]
     )
 
-    # Return early if starting_path is not provided.
-    if starting_path is None:
+    # Return early if starting_folder is not provided.
+    if starting_folder is None:
         return result_tuple({}, "No starting folder was provided.", 1)
 
     # Gather all files except those starting with "." and checksum them.
     # Then compare the checksums and make a dict of duplicate files.
-    unexpanded_starting_path = pathlib.Path(starting_path)
-    starting_path = unexpanded_starting_path.expanduser()
+    unexpanded_starting_folder = pathlib.Path(starting_folder)
+    starting_folder = unexpanded_starting_folder.expanduser()
     if show_progress:
         print("Gathering files...", file=sys.stderr)
-        glob_module_arg = str(starting_path) + "/**/[!.]*"
+        glob_module_arg = str(starting_folder) + "/**/[!.]*"
         sub_paths = glob.glob(glob_module_arg, recursive=True)
         checksum_result = checksum_paths_and_show_progress(sub_paths)
         checksum_result.paths_and_sums.sort()
         dupes = locate_dupes_and_show_progress(checksum_result.paths_and_sums)
     else:
-        sub_paths = starting_path.glob("**/[!.]*")
+        sub_paths = starting_folder.glob("**/[!.]*")
         checksum_result = checksum_paths(sub_paths)
         checksum_result.paths_and_sums.sort()
         dupes = locate_dupes(checksum_result.paths_and_sums)
