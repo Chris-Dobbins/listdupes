@@ -7,7 +7,7 @@ Writes its output to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
-__version__ = "Internal"
+__version__ = "6.0.0-alpha.1"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
@@ -76,6 +76,7 @@ class ProgressCounter(Cursor):
         self.print_text_before_counter()
         self.print_text_after_counter(self.after_counter)
         self.set_cursor_column_to(self.start_of_counter)
+        self.print_zero_to_counter()
 
     def print_counter(self, current_index):
         """Counter designed to be inserted in loops."""
@@ -127,6 +128,10 @@ class ProgressCounter(Cursor):
             file=self.output,
             end="",
         )
+
+    def print_zero_to_counter(self):
+        """Print a zero. Use this to initialize the counter."""
+        self.print_counter(-1)  # print_counter adds one to its arg.
 
     def end_count(self, append_newline=True):
         """Place the cursor at the end of the line and show it."""
