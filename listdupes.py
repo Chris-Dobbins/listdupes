@@ -228,8 +228,8 @@ def checksum_paths_and_show_progress(collection_of_paths):
     return return_value_tuple(paths_and_checksums, permission_errors)
 
 
-def find_dupes(paths_and_checksums):
-    """Finds duplicate files by comparing their checksums.
+def locate_dupes(paths_and_checksums):
+    """Locates duplicate files by comparing their checksums.
 
     Args:
         paths_and_checksums: A list of tuples, each containing a file
@@ -252,8 +252,8 @@ def find_dupes(paths_and_checksums):
     return dupes
 
 
-def find_dupes_and_show_progress(paths_and_checksums):
-    """As find_dupes but prints the loop's progress to terminal."""
+def locate_dupes_and_show_progress(paths_and_checksums):
+    """As locate_dupes but prints the loop's progress to terminal."""
     comparisons_progress = ProgressCounter(
         paths_and_checksums,
         text_before_counter="Comparing file ",
@@ -292,15 +292,15 @@ def sort_dict_values(dictionary, sort_key=None):
 
 
 def create_return_values(dictionary, checksum_result):
-    """Create values to pass to main's return_value_tuple constructor.
+    """Create values to pass to search_for_dupes' return_value_tuple constructor.
 
     Args:
-        dictionary: A dict returned by a find_dupes function.
+        dictionary: A dict returned by a locate_dupes function.
         checksum_result: A tuple returned by a checksum_paths function.
 
     Returns:
         An unnamed tuple suitable to be passed to the return_value_tuple
-        named tuple constructor. See main's docstring for more info.
+        named tuple constructor. See search_for_dupes' docstring for more info.
     """
 
     # Prepare to create description value.
@@ -340,7 +340,7 @@ def sum_length_of_dict_values(dictionary):
 
 
 def process_stdin_and_stream_results(csv_labels):
-    """Run main on paths streamed to stdin and stream the csv to stdout.
+    """Run search_for_dupes on paths streamed to stdin and stream the csv to stdout.
 
     Args:
         csv_labels: A iterable of strings or numbers which are written
@@ -348,17 +348,17 @@ def process_stdin_and_stream_results(csv_labels):
             pass []. To print a blank row pass ['', ''].
 
     Returns:
-        A list of all return codes produced by the calls to main.
+        A list of all return codes produced by the calls to search_for_dupes.
     """
 
     return_codes = []
     for index, line in enumerate(sys.stdin):
-        main_result = main(line.rstrip(), show_progress=args.progress)
+        search_result = search_for_dupes(line.rstrip(), show_progress=args.progress)
         csv_labels_arg = [] if index > 0 else csv_labels
         write_dupes_to_csv(  # The fd is kept open so writes append.
-            sys.stdout.fileno(), main_result.dupes, csv_labels_arg, closefd=False
+            sys.stdout.fileno(), search_result.dupes, csv_labels_arg, closefd=False
         )
-        return_codes.append(main_result.return_code)
+        return_codes.append(search_result.return_code)
     return return_codes
 
 
@@ -465,8 +465,8 @@ def get_listdupes_args(overriding_args=None):
     return args
 
 
-def main(starting_path, show_progress=False):
-    """Checks a path and its subfolders for duplicate files.
+def search_for_dupes(starting_path, show_progress=False):
+    """Searches a path and its subfolders for duplicate files.
 
     Args:
         starting_path: A string of the path to recursively search for
@@ -476,7 +476,7 @@ def main(starting_path, show_progress=False):
 
     Returns:
         A named tuple (dupes, description, return_code), where dupes
-        is a dictionary (As the return value of find_dupes but with
+        is a dictionary (As the return value of locate_dupes but with
         its sets replaced by lists), description is a string which
         describes the result, and return_code is an integer
         corresponding to the error.
@@ -484,7 +484,7 @@ def main(starting_path, show_progress=False):
 
     # Define return value.
     return_value_tuple = collections.namedtuple(
-        "main_return_tuple", ["dupes", "description", "return_code"]
+        "search_for_dupes_return_tuple", ["dupes", "description", "return_code"]
     )
 
     # Return early if starting_path is not provided.
@@ -501,13 +501,13 @@ def main(starting_path, show_progress=False):
         sub_paths = glob.glob(glob_module_arg, recursive=True)
         checksum_result = checksum_paths_and_show_progress(sub_paths)
         checksum_result.paths_and_sums.sort()
-        dupes = find_dupes_and_show_progress(checksum_result.paths_and_sums)
+        dupes = locate_dupes_and_show_progress(checksum_result.paths_and_sums)
     else:
         print("Gathering files...", file=sys.stderr)
         sub_paths = starting_path.glob("**/[!.]*")
         checksum_result = checksum_paths(sub_paths)
         checksum_result.paths_and_sums.sort()
-        dupes = find_dupes(checksum_result.paths_and_sums)
+        dupes = locate_dupes(checksum_result.paths_and_sums)
 
     # Sort the duplicates to prepare them for output.
     sort_dict_values(dupes)
@@ -522,14 +522,14 @@ if __name__ == "__main__":
     column_labels = ["File", "Duplicates"]
 
     if args.filter:
-        main_return_codes = process_stdin_and_stream_results(column_labels)
-        sys.exit(3 if any(main_return_codes) else 0)
+        search_for_dupes_return_codes = process_stdin_and_stream_results(column_labels)
+        sys.exit(3 if any(search_for_dupes_return_codes) else 0)
 
-    # Call main, print errors, and exit early if there are no results.
-    main_result = main(args.starting_folder, show_progress=args.progress)
-    print(main_result.description, file=sys.stderr)
-    if not main_result.dupes:
-        sys.exit(main_result.return_code)
+    # Call search_for_dupes, print errors, and exit early if there are no results.
+    search_result = search_for_dupes(args.starting_folder, show_progress=args.progress)
+    print(search_result.description, file=sys.stderr)
+    if not search_result.dupes:
+        sys.exit(search_result.return_code)
 
     # Determine the output's eventual file path.
     output_file_name = "listdupes_output.csv"
@@ -542,7 +542,7 @@ if __name__ == "__main__":
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        write_dupes_to_csv(output_path, main_result.dupes, column_labels)
+        write_dupes_to_csv(output_path, search_result.dupes, column_labels)
         print(
             f"The list of duplicates has been saved to {home_folder}.", file=sys.stderr
         )
@@ -550,7 +550,7 @@ if __name__ == "__main__":
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         handle_exception_at_write_time(sys.exc_info())
-        write_dupes_to_csv(sys.stdout.fileno(), main_result.dupes, column_labels)
+        write_dupes_to_csv(sys.stdout.fileno(), search_result.dupes, column_labels)
         sys.exit(1)
 
-    sys.exit(main_result.return_code)
+    sys.exit(search_result.return_code)
