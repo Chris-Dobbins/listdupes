@@ -516,41 +516,57 @@ def search_for_dupes(starting_path, show_progress=False):
     return return_value_tuple(*return_values)
 
 
-# Run the app!
-if __name__ == "__main__":
-    args = get_listdupes_args()  # The parser can exit with 2.
+def main(args):
+    """The functionality of the listdupes command-line app."""
+    # Define return value.
+    result_tuple = collections.namedtuple(
+        "main_return_tuple", ["final_message", "return_code"]
+    )
+
     column_labels = ["File", "Duplicates"]
 
     if args.filter:
-        search_for_dupes_return_codes = process_stdin_and_stream_results(column_labels)
-        sys.exit(3 if any(search_for_dupes_return_codes) else 0)
+        return_codes_from_search = process_stdin_and_stream_results(column_labels)
+        return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
-    # Call search_for_dupes, print errors, and exit early if there are no results.
+    # Call search_for_dupes, print its description, and return early if
+    # there aren't any dupes.
     search_result = search_for_dupes(args.starting_folder, show_progress=args.progress)
     print(search_result.description, file=sys.stderr)
     if not search_result.dupes:
-        sys.exit(search_result.return_code)
+        return result_tuple("", search_result.return_code)
 
     # Determine the output's eventual file path.
     output_file_name = "listdupes_output.csv"
     output_path = pathlib.Path("~", output_file_name).expanduser()
-    home_folder = output_path.parent
     try:
         output_path = make_file_path_unique(output_path)
     except FileExistsError:
-        sys.exit("Your home folder has a lot of output files. Clean up to proceed.")
+        return result_tuple(
+            "Your home folder has a lot of output files. Clean up to proceed.",
+            1,
+        )
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
         write_dupes_to_csv(output_path, search_result.dupes, column_labels)
-        print(
-            f"The list of duplicates has been saved to {home_folder}.", file=sys.stderr
-        )
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         handle_exception_at_write_time(sys.exc_info())
         write_dupes_to_csv(sys.stdout.fileno(), search_result.dupes, column_labels)
-        sys.exit(1)
+        return result_tuple("", 1)
 
-    sys.exit(search_result.return_code)
+    return result_tuple(
+        f"The list of duplicates has been saved to {output_path.parent}.",
+        search_result.return_code,
+    )
+
+
+# Run the app!
+if __name__ == "__main__":
+    args = get_listdupes_args()  # The parser can exit with 2.
+    main_result = main(args)
+    if main_result.final_message:
+        print(main_result.final_message, file=sys.stderr)
+    sys.exit(main_result.return_code)
