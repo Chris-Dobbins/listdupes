@@ -202,7 +202,7 @@ def checksum_paths_and_show_progress(collection_of_paths):
     """As checksum_paths but prints the loop's progress to terminal."""
     checksum_progress = ProgressCounter(
         collection_of_paths,
-        text_before_counter="Checking file ",
+        text_before_counter="Reading file ",
         text_after_counter=" of {}.",
     )
 
