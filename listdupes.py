@@ -140,6 +140,107 @@ class ProgressCounter(Cursor):
         print(self.show_cursor, file=self.output, end=end_arg)
 
 
+class Dupes(dict):
+    """TODO: Write This"""
+
+    def __init__(self, dictionary, paths_and_checksums):
+        self,
+        self.mapped = dictionary
+        self.paths_and_checksums = paths_and_checksums
+
+    def path_not_in_values(self, path_value):
+        """Checks if a path exists within a dict's collection values."""
+        for paths in self.mapped.values():
+            if path_value in paths:
+                return False
+        return True
+
+    def sort_values(self, sort_key=None):
+        """Convert collections to lists and sort them in place."""
+        for dict_key in self.mapped.keys():
+            list_of_values = list(self.mapped[dict_key])
+            list_of_values.sort(key=sort_key)
+            self.mapped[dict_key] = list_of_values
+
+    def status(self):
+        """Create values to pass to search_for_dupes' return tuple.
+
+        Returns:
+            An unnamed tuple suitable which can be unpacked into the
+            search_for_dupes_return_tuple constructor. See
+            search_for_dupes' docstring for more info.
+        """
+
+        # Prepare to create description value.
+        total_errors = self.paths_and_checksums.permission_errors
+        total = self.sum_length_of_values()
+        plural = total > 1
+        duplicate_s_ = "duplicates" if plural else "duplicate"
+        were_or_was = "were" if plural else "was"
+        description_of_the_result = f"{total} {duplicate_s_} {were_or_was}"
+
+        # Determine what values to return.
+        if self.paths_and_checksums.permission_errors and not self.mapped:
+            description = f"{total_errors} or more files couldn't be read."
+            return_code = 1
+        elif self.paths_and_checksums.permission_errors and self.mapped:
+            description = (
+                f"{description_of_the_result} found, however"
+                f" {total_errors} or more files couldn't be read."
+            )
+            return_code = 1
+        elif not self.mapped:
+            description = "No duplicates were found."
+            return_code = 0
+        else:
+            description = f"{description_of_the_result} found."
+            return_code = 0
+
+        return (self, description, return_code)
+
+    def sum_length_of_values(self):
+        """Sum the lengths of all a dict's values and return the sum"""
+        sum_total_length = 0
+        for dict_value in self.mapped.values():
+            sum_total_length += len(dict_value)
+        return sum_total_length
+
+    def write_to_csv(
+        self,
+        output_file,
+        labels,
+        encoding="utf-8",
+        errors="replace",
+        mode="x",
+        **kwargs,
+    ):
+        """Writes out the contents of a dict as an Excel style CSV.
+
+        Args:
+            output_file: A path-like object or an integer file description.
+            labels: A iterable of strings or numbers which are written
+                once as the first row of the file. To omit the label row
+                pass []. To print a blank row pass ['', ''].
+            encoding: Passed to the open function. Defaults to 'utf-8'.
+            errors: Passed to the open function. Defaults to 'replace'.
+            mode: Passed to the open function. Defaults to 'x'.
+            **kwargs: Passed to the open function.
+        """
+
+        with open(
+            output_file, encoding=encoding, mode=mode, errors=errors, **kwargs
+        ) as csv_file:
+            writer = csv.writer(csv_file)
+            if labels:
+                writer.writerow(labels)
+
+            for file, duplicates_list in self.mapped.items():
+                writer.writerow([file, duplicates_list[0]])
+                if len(duplicates_list) > 1:
+                    for duplicate in duplicates_list[1:]:
+                        writer.writerow(["", duplicate])
+
+
 # Functions
 def make_file_path_unique(path):
     """Makes a similarly named path object if a path already exists.
@@ -243,20 +344,22 @@ def locate_dupes(paths_and_checksums):
     """
 
     dupes = collections.defaultdict(set)
-    for index, element in enumerate(paths_and_checksums):
+    for index, element in enumerate(paths_and_checksums.paths_and_sums):
         path_being_searched, checksum_being_searched = element
 
-        for current_path, current_checksum in paths_and_checksums[index + 1 :]:
+        for current_path, current_checksum in paths_and_checksums.paths_and_sums[
+            index + 1 :
+        ]:
             checksums_are_equal = checksum_being_searched == current_checksum
             if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
                 dupes[path_being_searched].add(current_path)
-    return dupes
+    return Dupes(dupes, paths_and_checksums)
 
 
 def locate_dupes_and_show_progress(paths_and_checksums):
     """As locate_dupes but prints the loop's progress to terminal."""
     comparisons_progress = ProgressCounter(
-        paths_and_checksums,
+        paths_and_checksums.paths_and_sums,
         text_before_counter="Comparing file ",
         text_after_counter=" of {}.",
     )
@@ -264,17 +367,20 @@ def locate_dupes_and_show_progress(paths_and_checksums):
     dupes = collections.defaultdict(set)
     try:
         comparisons_progress.print_text_for_counter()
-        for index, element in enumerate(paths_and_checksums):
+        for index, element in enumerate(paths_and_checksums.paths_and_sums):
             path_being_searched, checksum_being_searched = element
             comparisons_progress.print_counter(index)
 
-            for current_path, current_checksum in paths_and_checksums[index + 1 :]:
+            for (
+                current_path,
+                current_checksum,
+            ) in paths_and_checksums.paths_and_sums[index + 1 :]:
                 checksums_are_equal = checksum_being_searched == current_checksum
                 if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
                     dupes[path_being_searched].add(current_path)
     finally:
         comparisons_progress.end_count()
-    return dupes
+    return Dupes(dupes, paths_and_checksums)
 
 
 def path_not_in_dict(path_value, dictionary):
@@ -283,63 +389,6 @@ def path_not_in_dict(path_value, dictionary):
         if path_value in paths:
             return False
     return True
-
-
-def sort_dict_values(dictionary, sort_key=None):
-    """Convert collections in a dict to lists and sort them in place."""
-    for dict_key in dictionary.keys():
-        list_of_values = list(dictionary[dict_key])
-        list_of_values.sort(key=sort_key)
-        dictionary[dict_key] = list_of_values
-
-
-def create_search_return_values(dictionary, checksum_result):
-    """Create values to pass to search_for_dupes' return tuple.
-
-    Args:
-        dictionary: A dict returned by a locate_dupes function.
-        checksum_result: A tuple returned by a checksum_paths function.
-
-    Returns:
-        An unnamed tuple suitable which can be unpacked into the
-        search_for_dupes_return_tuple constructor. See search_for_dupes'
-        docstring for more info.
-    """
-
-    # Prepare to create description value.
-    total_errors = checksum_result.permission_errors
-    total = sum_length_of_dict_values(dictionary)
-    plural = total > 1
-    duplicate_s_ = "duplicates" if plural else "duplicate"
-    were_or_was = "were" if plural else "was"
-    description_of_the_result = f"{total} {duplicate_s_} {were_or_was}"
-
-    # Determine what values to return.
-    if checksum_result.permission_errors and not dictionary:
-        description = f"{total_errors} or more files couldn't be read."
-        return_code = 1
-    elif checksum_result.permission_errors and dictionary:
-        description = (
-            f"{description_of_the_result} found, however"
-            f" {total_errors} or more files couldn't be read."
-        )
-        return_code = 1
-    elif not dictionary:
-        description = "No duplicates were found."
-        return_code = 0
-    else:
-        description = f"{description_of_the_result} found."
-        return_code = 0
-
-    return (dictionary, description, return_code)
-
-
-def sum_length_of_dict_values(dictionary):
-    """Sum the lengths of all a dict's values and return the sum"""
-    sum_total_length = 0
-    for dict_value in dictionary.values():
-        sum_total_length += len(dict_value)
-    return sum_total_length
 
 
 def search_stdin_and_stream_results(csv_labels):
@@ -358,42 +407,12 @@ def search_stdin_and_stream_results(csv_labels):
     for index, line in enumerate(sys.stdin):
         search_result = search_for_dupes(line.rstrip(), show_progress=args.progress)
         csv_labels_arg = [] if index > 0 else csv_labels
-        write_dupes_to_csv(  # The fd is kept open so writes append.
-            sys.stdout.fileno(), search_result.dupes, csv_labels_arg, closefd=False
+        # The fd is kept open so writes append.
+        search_result.dupes.write_to_csv(
+            sys.stdout.fileno(), csv_labels_arg, closefd=False
         )
         return_codes.append(search_result.return_code)
     return return_codes
-
-
-def write_dupes_to_csv(
-    output_file, dupes, labels, encoding="utf-8", errors="replace", mode="x", **kwargs
-):
-    """Writes out the contents of a dict as an Excel style CSV.
-
-    Args:
-        output_file: A path-like object or an integer file description.
-        dupes: The dict of duplicates to be written to the output_file.
-        labels: A iterable of strings or numbers which are written
-            once as the first row of the file. To omit the label row
-            pass []. To print a blank row pass ['', ''].
-        encoding: Passed to the open function. Defaults to 'utf-8'.
-        errors: Passed to the open function. Defaults to 'replace'.
-        mode: Passed to the open function. Defaults to 'x'.
-        **kwargs: Passed to the open function.
-    """
-
-    with open(
-        output_file, encoding=encoding, mode=mode, errors=errors, **kwargs
-    ) as csv_file:
-        writer = csv.writer(csv_file)
-        if labels:
-            writer.writerow(labels)
-
-        for file, duplicates_list in dupes.items():
-            writer.writerow([file, duplicates_list[0]])
-            if len(duplicates_list) > 1:
-                for duplicate in duplicates_list[1:]:
-                    writer.writerow(["", duplicate])
 
 
 def handle_exception_at_write_time(exception_info):
@@ -502,17 +521,17 @@ def search_for_dupes(starting_folder, show_progress=False):
         sub_paths = glob.glob(glob_module_arg, recursive=True)
         checksum_result = checksum_paths_and_show_progress(sub_paths)
         checksum_result.paths_and_sums.sort()
-        dupes = locate_dupes_and_show_progress(checksum_result.paths_and_sums)
+        dupes = locate_dupes_and_show_progress(checksum_result)
     else:
         sub_paths = starting_folder.glob("**/[!.]*")
         checksum_result = checksum_paths(sub_paths)
         checksum_result.paths_and_sums.sort()
-        dupes = locate_dupes(checksum_result.paths_and_sums)
+        dupes = locate_dupes(checksum_result)
 
     # Sort the duplicates to prepare them for output.
-    sort_dict_values(dupes)
+    dupes.sort_values()
 
-    return_values = create_search_return_values(dupes, checksum_result)
+    return_values = dupes.status()
     return result_tuple(*return_values)
 
 
@@ -552,12 +571,12 @@ def main(args):
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        write_dupes_to_csv(output_path, search_result.dupes, column_labels)
+        search_result.dupes.write_to_csv(output_path, column_labels)
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         handle_exception_at_write_time(sys.exc_info())
-        write_dupes_to_csv(sys.stdout.fileno(), search_result.dupes, column_labels)
+        search_result.dupes.write_to_csv(sys.stdout.fileno(), column_labels)
         return result_tuple("", 1)
 
     return result_tuple(
