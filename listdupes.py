@@ -141,6 +141,24 @@ class ProgressCounter(Cursor):
 
 
 # Functions
+def starting_path_is_invalid(path):
+    """Determine if the path is an existing folder.
+
+    Args:
+        path: An instance of pathlib.Path or its subclasses.
+
+    Returns:
+        A string describing why the path is invalid, or an empty string.
+    """
+
+    if not path.is_dir():
+        return "The starting path must be a folder."
+    elif not path.exists():
+        return "No file exist at that location."
+    else:
+        return ""
+
+
 def make_file_path_unique(path):
     """Makes a similarly named path object if a path already exists.
 
@@ -443,6 +461,7 @@ def get_listdupes_args(overriding_args=None):
     )
     parser.add_argument(
         "starting_folder",
+        type=pathlib.Path,
         nargs="?",
         help="Accepts a single path from the terminal.",
     )
@@ -534,6 +553,11 @@ def main(args):
             "Your home folder has a lot of output files. Clean up to proceed.",
             1,
         )
+
+    # Exit early if the path to the starting folder's invalid.
+    problem_with_starting_path = starting_path_is_invalid(args.starting_folder)
+    if problem_with_starting_path:
+        return result_tuple(problem_with_starting_path, 1)
 
     column_labels = ["File", "Duplicates"]
 
