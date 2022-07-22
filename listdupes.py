@@ -151,10 +151,10 @@ def starting_path_is_invalid(path):
         A string describing why the path is invalid, or an empty string.
     """
 
-    if not path.is_dir():
+    if not path.exists():
+        return "No such file exist at that location."
+    elif not path.is_dir():
         return "The starting path must be a folder."
-    elif not path.exists():
-        return "No file exist at that location."
     else:
         return ""
 
