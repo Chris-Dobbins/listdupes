@@ -143,10 +143,10 @@ class ProgressCounter(Cursor):
 class Dupes(dict):
     """TODO: Write This"""
 
-    def __init__(self, dictionary, paths_and_checksums):
+    def __init__(self, dictionary, checksum_result):
         self,
         self.mapped = dictionary
-        self.paths_and_checksums = paths_and_checksums
+        self.checksum_result = checksum_result
 
     def path_not_in_values(self, path_value):
         """Checks if a path exists within a dict's collection values."""
@@ -172,7 +172,7 @@ class Dupes(dict):
         """
 
         # Prepare to create description value.
-        total_errors = self.paths_and_checksums.permission_errors
+        total_errors = self.checksum_result.permission_errors
         total = self.sum_length_of_values()
         plural = total > 1
         duplicate_s_ = "duplicates" if plural else "duplicate"
@@ -180,10 +180,10 @@ class Dupes(dict):
         description_of_the_result = f"{total} {duplicate_s_} {were_or_was}"
 
         # Determine what values to return.
-        if self.paths_and_checksums.permission_errors and not self.mapped:
+        if self.checksum_result.permission_errors and not self.mapped:
             description = f"{total_errors} or more files couldn't be read."
             return_code = 1
-        elif self.paths_and_checksums.permission_errors and self.mapped:
+        elif self.checksum_result.permission_errors and self.mapped:
             description = (
                 f"{description_of_the_result} found, however"
                 f" {total_errors} or more files couldn't be read."
@@ -279,7 +279,7 @@ def checksum_paths(collection_of_paths):
         "checksum_paths_return_tuple", ["paths_and_sums", "permission_errors"]
     )
     permission_errors = 0
-    paths_and_checksums = []
+    paths_and_sums = []
     for file_path in collection_of_paths:
         try:
             with open(file_path, mode="rb") as file:
@@ -289,8 +289,8 @@ def checksum_paths(collection_of_paths):
         except PermissionError:
             permission_errors += 1
             continue
-        paths_and_checksums.append((file_path, checksum))
-    return result_tuple(paths_and_checksums, permission_errors)
+        paths_and_sums.append((file_path, checksum))
+    return result_tuple(paths_and_sums, permission_errors)
 
 
 def checksum_paths_and_show_progress(collection_of_paths):
@@ -305,7 +305,7 @@ def checksum_paths_and_show_progress(collection_of_paths):
         "checksum_paths_return_tuple", ["paths_and_sums", "permission_errors"]
     )
     permission_errors = 0
-    paths_and_checksums = []
+    paths_and_sums = []
     try:
         checksum_progress.print_text_for_counter()
         for index, file_path in enumerate(collection_of_paths):
@@ -317,18 +317,18 @@ def checksum_paths_and_show_progress(collection_of_paths):
             except PermissionError:
                 permission_errors += 1
                 continue
-            paths_and_checksums.append((file_path, checksum))
+            paths_and_sums.append((file_path, checksum))
             checksum_progress.print_counter(index)
     finally:
         checksum_progress.end_count()
-    return result_tuple(paths_and_checksums, permission_errors)
+    return result_tuple(paths_and_sums, permission_errors)
 
 
-def locate_dupes(paths_and_checksums):
+def locate_dupes(checksum_result):
     """Locates duplicate files by comparing their checksums.
 
     Args:
-        paths_and_checksums: A list of tuples, each containing a file
+        checksum_result: A list of tuples, each containing a file
             path and the checksum of the corresponding file.
 
     Returns:
@@ -338,22 +338,20 @@ def locate_dupes(paths_and_checksums):
     """
 
     dupes = collections.defaultdict(set)
-    for index, element in enumerate(paths_and_checksums.paths_and_sums):
+    for index, element in enumerate(checksum_result.paths_and_sums):
         path_being_searched, checksum_being_searched = element
 
-        for current_path, current_checksum in paths_and_checksums.paths_and_sums[
-            index + 1 :
-        ]:
-            checksums_are_equal = checksum_being_searched == current_checksum
+        for path, checksum in checksum_result.paths_and_sums[index + 1 :]:
+            checksums_are_equal = checksum_being_searched == checksum
             if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
-                dupes[path_being_searched].add(current_path)
-    return Dupes(dupes, paths_and_checksums)
+                dupes[path_being_searched].add(path)
+    return Dupes(dupes, checksum_result)
 
 
-def locate_dupes_and_show_progress(paths_and_checksums):
+def locate_dupes_and_show_progress(checksum_result):
     """As locate_dupes but prints the loop's progress to terminal."""
     comparisons_progress = ProgressCounter(
-        paths_and_checksums.paths_and_sums,
+        checksum_result.paths_and_sums,
         text_before_counter="Comparing file ",
         text_after_counter=" of {}.",
     )
@@ -361,20 +359,17 @@ def locate_dupes_and_show_progress(paths_and_checksums):
     dupes = collections.defaultdict(set)
     try:
         comparisons_progress.print_text_for_counter()
-        for index, element in enumerate(paths_and_checksums.paths_and_sums):
+        for index, element in enumerate(checksum_result.paths_and_sums):
             path_being_searched, checksum_being_searched = element
             comparisons_progress.print_counter(index)
 
-            for (
-                current_path,
-                current_checksum,
-            ) in paths_and_checksums.paths_and_sums[index + 1 :]:
-                checksums_are_equal = checksum_being_searched == current_checksum
+            for path, checksum in checksum_result.paths_and_sums[index + 1 :]:
+                checksums_are_equal = checksum_being_searched == checksum
                 if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
-                    dupes[path_being_searched].add(current_path)
+                    dupes[path_being_searched].add(path)
     finally:
         comparisons_progress.end_count()
-    return Dupes(dupes, paths_and_checksums)
+    return Dupes(dupes, checksum_result)
 
 
 def path_not_in_dict(path_value, dictionary):
