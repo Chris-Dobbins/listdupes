@@ -177,7 +177,7 @@ def make_file_path_unique(path):
         if not path.exists() and not new_path:
             return path
         elif not new_path or new_path.exists():
-            new_path = path.with_stem(path.stem + str(numeric_suffix))
+            new_path = path.parent / (path.stem + str(numeric_suffix) + path.suffix)
         else:
             return new_path
     raise FileExistsError("A unique path name could not be created.")
