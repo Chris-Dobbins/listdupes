@@ -542,29 +542,27 @@ def main(args):
     )
 
     # Determine the output's eventual file path.
-    # NOTE: This is done as early as possible to allow for an early exit
-    # if we can't write to a drive.
+    # NOTE: This is done as early as possible to allow for
+    # an early exit if we can't write to a drive.
     output_file_name = "listdupes_output.csv"
     output_path = pathlib.Path("~", output_file_name).expanduser()
     try:
         output_path = make_file_path_unique(output_path)
     except FileExistsError:
-        return result_tuple(
-            "Your home folder has a lot of output files. Clean up to proceed.",
-            1,
-        )
+        message = "Your home folder has a lot of output files. Clean up to proceed."
+        return result_tuple(message, 1)
 
     # Exit early if the path to the starting folder's invalid.
     problem_with_starting_path = starting_path_is_invalid(args.starting_folder)
     if problem_with_starting_path:
         return result_tuple(problem_with_starting_path, 1)
 
-    column_labels = ["File", "Duplicates"]
+    csv_column_labels = ["File", "Duplicates"]
 
     if args.filter:
         if args.progress:
             print("Processing input stream...", file=sys.stderr)
-        return_codes_from_search = search_stdin_and_stream_results(column_labels)
+        return_codes_from_search = search_stdin_and_stream_results(csv_column_labels)
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
     # Call search_for_dupes, print its description, and return early if
@@ -576,18 +574,16 @@ def main(args):
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        write_dupes_to_csv(output_path, search_result.dupes, column_labels)
+        write_dupes_to_csv(output_path, search_result.dupes, csv_column_labels)
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         handle_exception_at_write_time(sys.exc_info())
-        write_dupes_to_csv(sys.stdout.fileno(), search_result.dupes, column_labels)
+        write_dupes_to_csv(sys.stdout.fileno(), search_result.dupes, csv_column_labels)
         return result_tuple("", 1)
 
-    return result_tuple(
-        f"The list of duplicates has been saved to {output_path.parent}.",
-        search_result.return_code,
-    )
+    message = f"The list of duplicates has been saved to {output_path.parent}."
+    return result_tuple(message, search_result.return_code)
 
 
 # Run the app!
