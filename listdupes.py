@@ -206,13 +206,7 @@ class Dupes(dict):
         return sum_total_length
 
     def write_to_csv(
-        self,
-        output_file,
-        labels,
-        encoding="utf-8",
-        errors="replace",
-        mode="x",
-        **kwargs,
+        self, file, labels, encoding="utf-8", errors="replace", mode="x", **kwargs
     ):
         """Writes out the contents of a dict as an Excel style CSV.
 
@@ -228,14 +222,14 @@ class Dupes(dict):
         """
 
         with open(
-            output_file, encoding=encoding, mode=mode, errors=errors, **kwargs
+            file, encoding=encoding, mode=mode, errors=errors, **kwargs
         ) as csv_file:
             writer = csv.writer(csv_file)
             if labels:
                 writer.writerow(labels)
 
-            for file, duplicates_list in self.mapped.items():
-                writer.writerow([file, duplicates_list[0]])
+            for file_with_duplicate, duplicates_list in self.mapped.items():
+                writer.writerow([file_with_duplicate, duplicates_list[0]])
                 if len(duplicates_list) > 1:
                     for duplicate in duplicates_list[1:]:
                         writer.writerow(["", duplicate])
