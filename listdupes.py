@@ -7,7 +7,7 @@ Writes its output to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
-__version__ = "Internal"
+__version__ = "6.0.0-alpha.3"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
@@ -246,6 +246,24 @@ class Dupes(dict):
 
 
 # Functions
+def starting_path_is_invalid(path):
+    """Determine if the path is an existing folder.
+
+    Args:
+        path: An instance of pathlib.Path or its subclasses.
+
+    Returns:
+        A string describing why the path is invalid, or an empty string.
+    """
+
+    if not path.exists():
+        return "No such file exist at that location."
+    elif not path.is_dir():
+        return "The starting path must be a folder."
+    else:
+        return ""
+
+
 def make_file_path_unique(path):
     """Makes a similarly named path object if a path already exists.
 
@@ -264,7 +282,7 @@ def make_file_path_unique(path):
         if not path.exists() and not new_path:
             return path
         elif not new_path or new_path.exists():
-            new_path = path.with_stem(path.stem + str(numeric_suffix))
+            new_path = path.parent / (path.stem + str(numeric_suffix) + path.suffix)
         else:
             return new_path
     raise FileExistsError("A unique path name could not be created.")
@@ -459,6 +477,7 @@ def get_listdupes_args(overriding_args=None):
     )
     parser.add_argument(
         "starting_folder",
+        type=pathlib.Path,
         nargs="?",
         help="Accepts a single path from the terminal.",
     )
@@ -539,24 +558,27 @@ def main(args):
     )
 
     # Determine the output's eventual file path.
-    # NOTE: This is done as early as possible to allow for an early exit
-    # if we can't write to a drive.
+    # NOTE: This is done as early as possible to allow for
+    # an early exit if we can't write to a drive.
     output_file_name = "listdupes_output.csv"
     output_path = pathlib.Path("~", output_file_name).expanduser()
     try:
         output_path = make_file_path_unique(output_path)
     except FileExistsError:
-        return result_tuple(
-            "Your home folder has a lot of output files. Clean up to proceed.",
-            1,
-        )
+        message = "Your home folder has a lot of output files. Clean up to proceed."
+        return result_tuple(message, 1)
 
-    column_labels = ["File", "Duplicates"]
+    # Exit early if the path to the starting folder's invalid.
+    problem_with_starting_path = starting_path_is_invalid(args.starting_folder)
+    if problem_with_starting_path:
+        return result_tuple(problem_with_starting_path, 1)
+
+    csv_column_labels = ["File", "Duplicates"]
 
     if args.filter:
         if args.progress:
             print("Processing input stream...", file=sys.stderr)
-        return_codes_from_search = search_stdin_and_stream_results(column_labels)
+        return_codes_from_search = search_stdin_and_stream_results(csv_column_labels)
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
     # Call search_for_dupes, print its description, and return early if
@@ -568,18 +590,16 @@ def main(args):
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        search_result.write_to_csv(output_path, column_labels)
+        search_result.write_to_csv(output_path, csv_column_labels)
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         handle_exception_at_write_time(sys.exc_info())
-        search_result.write_to_csv(sys.stdout.fileno(), column_labels)
+        search_result.write_to_csv(sys.stdout.fileno(), csv_column_labels)
         return result_tuple("", 1)
 
-    return result_tuple(
-        f"The list of duplicates has been saved to {output_path.parent}.",
-        search_result.return_code,
-    )
+    message = f"The list of duplicates has been saved to {output_path.parent}."
+    return result_tuple(message, search_result.return_code)
 
 
 # Run the app!
