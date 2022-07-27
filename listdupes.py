@@ -152,7 +152,7 @@ class Dupes(dict):
                 to Dupes' superclass.
             checksum_result: A named tuple containing the results of
                 the process which produced the dictionary.
-                See the return value of checksum_paths.
+                See the return value of checksum_files.
         """
 
         super().__init__(dictionary)
@@ -288,7 +288,7 @@ def make_file_path_unique(path):
     raise FileExistsError("A unique path name could not be created.")
 
 
-def checksum_paths(collection_of_paths):
+def checksum_files(collection_of_paths):
     """Checksums files and stores their checksums alongside their paths.
 
     Args:
@@ -304,7 +304,7 @@ def checksum_paths(collection_of_paths):
     """
 
     result_tuple = collections.namedtuple(
-        "checksum_paths_return_tuple", ["paths_and_sums", "permission_errors"]
+        "checksum_files_return_tuple", ["paths_and_sums", "permission_errors"]
     )
     permission_errors = 0
     paths_and_sums = []
@@ -321,8 +321,8 @@ def checksum_paths(collection_of_paths):
     return result_tuple(paths_and_sums, permission_errors)
 
 
-def checksum_paths_and_show_progress(collection_of_paths):
-    """As checksum_paths but prints the loop's progress to terminal."""
+def checksum_files_and_show_progress(collection_of_paths):
+    """As checksum_files but prints the loop's progress to terminal."""
     checksum_progress = ProgressCounter(
         collection_of_paths,
         text_before_counter="Reading file ",
@@ -330,7 +330,7 @@ def checksum_paths_and_show_progress(collection_of_paths):
     )
 
     result_tuple = collections.namedtuple(
-        "checksum_paths_return_tuple", ["paths_and_sums", "permission_errors"]
+        "checksum_files_return_tuple", ["paths_and_sums", "permission_errors"]
     )
     permission_errors = 0
     paths_and_sums = []
@@ -535,12 +535,12 @@ def search_for_dupes(starting_folder, show_progress=False):
         print("Gathering files...", file=sys.stderr)
         glob_module_arg = str(starting_folder) + "/**/[!.]*"
         sub_paths = glob.glob(glob_module_arg, recursive=True)
-        checksum_result = checksum_paths_and_show_progress(sub_paths)
+        checksum_result = checksum_files_and_show_progress(sub_paths)
         checksum_result.paths_and_sums.sort()
         dupes = locate_dupes_and_show_progress(checksum_result)
     else:
         sub_paths = starting_folder.glob("**/[!.]*")
-        checksum_result = checksum_paths(sub_paths)
+        checksum_result = checksum_files(sub_paths)
         checksum_result.paths_and_sums.sort()
         dupes = locate_dupes(checksum_result)
 
