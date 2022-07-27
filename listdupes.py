@@ -141,26 +141,36 @@ class ProgressCounter(Cursor):
 
 
 class Dupes(dict):
-    """TODO: Write This"""
+    """The results of a search for duplicate files."""
 
     def __init__(self, dictionary, checksum_result):
-        self,
-        self.mapped = dictionary
+        """The values used to initialize a new instance of Dupes.
+
+        Args:
+            dictionary: A mapping of file paths to collections of
+                paths to files with duplicate contents. This is passed
+                to Dupes' superclass.
+            checksum_result: A named tuple containing the results of
+                the process which produced the dictionary.
+                See the return value of checksum_paths.
+        """
+
+        super().__init__(dictionary)
         self.checksum_result = checksum_result
 
     def path_not_in_values(self, path_value):
         """Checks if a path exists within a dict's collection values."""
-        for paths in self.mapped.values():
+        for paths in self.values():
             if path_value in paths:
                 return False
         return True
 
     def sort_values(self, sort_key=None):
         """Convert collections to lists and sort them in place."""
-        for dict_key in self.mapped.keys():
-            list_of_values = list(self.mapped[dict_key])
+        for dict_key in self.keys():
+            list_of_values = list(self[dict_key])
             list_of_values.sort(key=sort_key)
-            self.mapped[dict_key] = list_of_values
+            self[dict_key] = list_of_values
 
     def status(self):
         """Create values to pass to search_for_dupes' return tuple.
@@ -180,16 +190,16 @@ class Dupes(dict):
         description_of_the_result = f"{total} {duplicate_s_} {were_or_was}"
 
         # Determine what values to return.
-        if self.checksum_result.permission_errors and not self.mapped:
+        if self.checksum_result.permission_errors and not self:
             description = f"{total_errors} or more files couldn't be read."
             return_code = 1
-        elif self.checksum_result.permission_errors and self.mapped:
+        elif self.checksum_result.permission_errors and self:
             description = (
                 f"{description_of_the_result} found, however"
                 f" {total_errors} or more files couldn't be read."
             )
             return_code = 1
-        elif not self.mapped:
+        elif not self:
             description = "No duplicates were found."
             return_code = 0
         else:
@@ -201,7 +211,7 @@ class Dupes(dict):
     def sum_length_of_values(self):
         """Sum the lengths of all a dict's values and return the sum"""
         sum_total_length = 0
-        for dict_value in self.mapped.values():
+        for dict_value in self.values():
             sum_total_length += len(dict_value)
         return sum_total_length
 
@@ -228,7 +238,7 @@ class Dupes(dict):
             if labels:
                 writer.writerow(labels)
 
-            for file_with_duplicate, duplicates_list in self.mapped.items():
+            for file_with_duplicate, duplicates_list in self.items():
                 writer.writerow([file_with_duplicate, duplicates_list[0]])
                 if len(duplicates_list) > 1:
                     for duplicate in duplicates_list[1:]:
@@ -397,9 +407,7 @@ def search_stdin_and_stream_results(csv_labels):
         search_result = search_for_dupes(line.rstrip(), show_progress=args.progress)
         csv_labels_arg = [] if index > 0 else csv_labels
         # The fd is kept open so writes append.
-        search_result.dupes.write_to_csv(
-            sys.stdout.fileno(), csv_labels_arg, closefd=False
-        )
+        search_result.write_to_csv(sys.stdout.fileno(), csv_labels_arg, closefd=False)
         return_codes.append(search_result.return_code)
     return return_codes
 
@@ -555,17 +563,17 @@ def main(args):
     # there aren't any dupes.
     search_result = search_for_dupes(args.starting_folder, show_progress=args.progress)
     print(search_result.description, file=sys.stderr)
-    if not search_result.dupes:
+    if not search_result:
         return result_tuple("", search_result.return_code)
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        search_result.dupes.write_to_csv(output_path, column_labels)
+        search_result.write_to_csv(output_path, column_labels)
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         handle_exception_at_write_time(sys.exc_info())
-        search_result.dupes.write_to_csv(sys.stdout.fileno(), column_labels)
+        search_result.write_to_csv(sys.stdout.fileno(), column_labels)
         return result_tuple("", 1)
 
     return result_tuple(
