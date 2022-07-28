@@ -601,7 +601,7 @@ def main(args):
     # there aren't any dupes.
     search_result = search_for_dupes(args.starting_folder, show_progress=args.progress)
     print(search_result.description, file=sys.stderr)
-    if not search_result:
+    if not search_result.dupes:
         return result_tuple("", search_result.return_code)
 
     # Format the duplicate paths as a CSV and write it to a file.
