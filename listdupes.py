@@ -7,6 +7,17 @@ Writes its output to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
+__all__ = [
+    "checksum_files",
+    "checksum_files_and_show_progress",
+    "Dupes",
+    "get_listdupes_args",
+    "locate_dupes",
+    "locate_dupes_and_show_progress",
+    "main",
+    "path_not_in_dict",
+    "search_for_dupes",
+]
 __version__ = "6.0.0-alpha.3"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
@@ -23,7 +34,7 @@ from zlib import crc32 as checksummer
 
 
 # Classes
-class Cursor:
+class _Cursor:
     """Provides structure to subclasses which write to terminal."""
 
     hide_cursor = "\x1b[?25l"  # Terminal escape codes.
@@ -33,14 +44,14 @@ class Cursor:
         self.output = output
 
     def hide_cursor_from_user(self):
-        print(Cursor.hide_cursor, file=self.output, end="")
+        print(_Cursor.hide_cursor, file=self.output, end="")
 
     def set_cursor_column_to(self, column_number):
         set_cursor_column_esc_code = f"\x1b[{column_number}G"
         print(set_cursor_column_esc_code, file=self.output, end="")
 
 
-class ProgressCounter(Cursor):
+class _ProgressCounter(_Cursor):
     """Methods for printing the state of an iteration to a terminal."""
 
     def __init__(
@@ -246,7 +257,7 @@ class Dupes(dict):
 
 
 # Functions
-def starting_path_is_invalid(path):
+def _starting_path_is_invalid(path):
     """Determine if the path is an existing folder.
 
     Args:
@@ -264,7 +275,7 @@ def starting_path_is_invalid(path):
         return ""
 
 
-def make_file_path_unique(path):
+def _make_file_path_unique(path):
     """Makes a similarly named path object if a path already exists.
 
     Args:
@@ -323,7 +334,7 @@ def checksum_files(collection_of_paths):
 
 def checksum_files_and_show_progress(collection_of_paths):
     """As checksum_files but prints the loop's progress to terminal."""
-    checksum_progress = ProgressCounter(
+    checksum_progress = _ProgressCounter(
         collection_of_paths,
         text_before_counter="Reading file ",
         text_after_counter=" of {}.",
@@ -378,7 +389,7 @@ def locate_dupes(checksum_result):
 
 def locate_dupes_and_show_progress(checksum_result):
     """As locate_dupes but prints the loop's progress to terminal."""
-    comparisons_progress = ProgressCounter(
+    comparisons_progress = _ProgressCounter(
         checksum_result.paths_and_sums,
         text_before_counter="Comparing file ",
         text_after_counter=" of {}.",
@@ -408,7 +419,7 @@ def path_not_in_dict(path_value, dictionary):
     return True
 
 
-def search_stdin_and_stream_results(csv_labels):
+def _search_stdin_and_stream_results(csv_labels):
     """Search paths from stdin for dupes and stream results to stdout.
 
     Args:
@@ -430,7 +441,7 @@ def search_stdin_and_stream_results(csv_labels):
     return return_codes
 
 
-def handle_exception_at_write_time(exception_info):
+def _handle_exception_at_write_time(exception_info):
     """Prints a message and the exception's traceback. Doesn't exit."""
     error_message = (
         "An error prevented the app from saving its results.\n"
@@ -563,13 +574,13 @@ def main(args):
     output_file_name = "listdupes_output.csv"
     output_path = pathlib.Path("~", output_file_name).expanduser()
     try:
-        output_path = make_file_path_unique(output_path)
+        output_path = _make_file_path_unique(output_path)
     except FileExistsError:
         message = "Your home folder has a lot of output files. Clean up to proceed."
         return result_tuple(message, 1)
 
     # Exit early if the path to the starting folder's invalid.
-    problem_with_starting_path = starting_path_is_invalid(args.starting_folder)
+    problem_with_starting_path = _starting_path_is_invalid(args.starting_folder)
     if problem_with_starting_path:
         return result_tuple(problem_with_starting_path, 1)
 
@@ -578,7 +589,7 @@ def main(args):
     if args.filter:
         if args.progress:
             print("Processing input stream...", file=sys.stderr)
-        return_codes_from_search = search_stdin_and_stream_results(csv_column_labels)
+        return_codes_from_search = _search_stdin_and_stream_results(csv_column_labels)
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
     # Call search_for_dupes, print its description, and return early if
@@ -594,7 +605,7 @@ def main(args):
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
-        handle_exception_at_write_time(sys.exc_info())
+        _handle_exception_at_write_time(sys.exc_info())
         search_result.write_to_csv(sys.stdout.fileno(), csv_column_labels)
         return result_tuple("", 1)
 
