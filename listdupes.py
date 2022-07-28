@@ -184,13 +184,17 @@ class Dupes(dict):
             self[dict_key] = list_of_values
 
     def status(self):
-        """Create values to pass to search_for_dupes' return tuple.
+        """Describe the dupes and errors found and assign a return code.
 
         Returns:
-            An unnamed tuple suitable which can be unpacked into the
-            search_for_dupes_return_tuple constructor. See
-            search_for_dupes' docstring for more info.
+            A named tuple (description, return_code), where description
+            is a string describing the number of dupes and errors, and
+            return_code is an integer corresponding to the description.
         """
+
+        result_tuple = collections.namedtuple(
+            "search_status_return_tuple", ["description", "return_code"]
+        )
 
         # Prepare to create description value.
         total_errors = self.checksum_result.permission_errors
@@ -217,7 +221,7 @@ class Dupes(dict):
             description = f"{description_of_the_result} found."
             return_code = 0
 
-        return (self, description, return_code)
+        return result_tuple(description, return_code)
 
     def sum_length_of_values(self):
         """Sum the lengths of all a dict's values and return the sum"""
@@ -523,11 +527,10 @@ def search_for_dupes(starting_folder, show_progress=False):
             of checksumming and comparison processes. Defaults to False.
 
     Returns:
-        A named tuple (dupes, description, return_code), where dupes
-        is a dictionary (As the return value of locate_dupes but with
-        its sets replaced by lists), description is a string which
-        describes the result, and return_code is an integer
-        corresponding to the error.
+        A named tuple (dupes, description, return_code), where dupes is
+        a Dupes object (As per the return value of locate_dupes but with
+        its sets sorted into lists), and description and return_code are
+        a string and an integer as per the return of Dupes.status().
     """
 
     result_tuple = collections.namedtuple(
@@ -558,8 +561,8 @@ def search_for_dupes(starting_folder, show_progress=False):
     # Sort the duplicates to prepare them for output.
     dupes.sort_values()
 
-    return_values = dupes.status()
-    return result_tuple(*return_values)
+    search_status = dupes.status()
+    return result_tuple(dupes, search_status.description, search_status.return_code)
 
 
 def main(args):
