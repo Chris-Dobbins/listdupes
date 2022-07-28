@@ -440,7 +440,9 @@ def _search_stdin_and_stream_results(csv_labels):
         search_result = search_for_dupes(line.rstrip(), show_progress=args.progress)
         csv_labels_arg = [] if index > 0 else csv_labels
         # The fd is kept open so writes append.
-        search_result.write_to_csv(sys.stdout.fileno(), csv_labels_arg, closefd=False)
+        search_result.dupes.write_to_csv(
+            sys.stdout.fileno(), csv_labels_arg, closefd=False
+        )
         return_codes.append(search_result.return_code)
     return return_codes
 
@@ -604,12 +606,12 @@ def main(args):
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        search_result.write_to_csv(output_path, csv_column_labels)
+        search_result.dupes.write_to_csv(output_path, csv_column_labels)
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         _handle_exception_at_write_time(sys.exc_info())
-        search_result.write_to_csv(sys.stdout.fileno(), csv_column_labels)
+        search_result.dupes.write_to_csv(sys.stdout.fileno(), csv_column_labels)
         return result_tuple("", 1)
 
     message = f"The list of duplicates has been saved to {output_path.parent}."
