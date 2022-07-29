@@ -15,7 +15,6 @@ __all__ = [
     "locate_dupes",
     "locate_dupes_and_show_progress",
     "main",
-    "path_not_in_dict",
     "search_for_dupes",
 ]
 __version__ = "6.0.0-alpha.3"
@@ -151,28 +150,25 @@ class _ProgressCounter(_Cursor):
         print(self.show_cursor, file=self.output, end=end_arg)
 
 
-class Dupes(dict):
+class Dupes(collections.defaultdict):
     """The results of a search for duplicate files."""
 
     def __init__(self, dictionary, checksum_result):
         """The values used to initialize a new instance of Dupes.
 
         Args:
-            dictionary: A mapping of file paths to collections of
-                paths to files with duplicate contents. This is passed
-                to Dupes' superclass.
-            checksum_result: A named tuple containing the results of
-                the process which produced the dictionary.
-                See the return value of checksum_files.
+            dictionary: A dict which initializes Dupes' superclass.
+            checksum_result: A named tuple containing the results of a
+                checksum process. As per the return of checksum_files.
         """
 
-        super().__init__(dictionary)
+        super().__init__(set, dictionary)
         self.checksum_result = checksum_result
 
-    def path_not_in_values(self, path_value):
-        """Checks if a path exists within a dict's collection values."""
-        for paths in self.values():
-            if path_value in paths:
+    def not_in_values(self, test_value):
+        """Check if a value exists within the mapping's values."""
+        for collection in self.values():
+            if test_value in collection:
                 return False
         return True
 
@@ -372,23 +368,23 @@ def locate_dupes(checksum_result):
 
     Args:
         checksum_result: A list of tuples, each containing a file
-            path and the checksum of the corresponding file.
+            path and the checksum of the associated file.
 
     Returns:
-        A dictionary of paths mapped to sets of paths whose associated
-        checksums match the checksum associated with the path key.
-        The dictionary never contains a path more than once.
+        A Dupes object containing path keys which are mapped to sets of
+        paths whose associated checksums match the checksum associated
+        with their path keys. Never contains a path more than once.
     """
 
-    dupes = collections.defaultdict(set)
+    dupes = Dupes({}, checksum_result)
     for index, element in enumerate(checksum_result.paths_and_sums):
         path_being_searched, checksum_being_searched = element
 
         for path, checksum in checksum_result.paths_and_sums[index + 1 :]:
             checksums_are_equal = checksum_being_searched == checksum
-            if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
+            if checksums_are_equal and dupes.not_in_values(path_being_searched):
                 dupes[path_being_searched].add(path)
-    return Dupes(dupes, checksum_result)
+    return dupes
 
 
 def locate_dupes_and_show_progress(checksum_result):
@@ -399,7 +395,7 @@ def locate_dupes_and_show_progress(checksum_result):
         text_after_counter=" of {}.",
     )
 
-    dupes = collections.defaultdict(set)
+    dupes = Dupes({}, checksum_result)
     try:
         comparisons_progress.print_text_for_counter()
         for index, element in enumerate(checksum_result.paths_and_sums):
@@ -408,19 +404,11 @@ def locate_dupes_and_show_progress(checksum_result):
 
             for path, checksum in checksum_result.paths_and_sums[index + 1 :]:
                 checksums_are_equal = checksum_being_searched == checksum
-                if checksums_are_equal and path_not_in_dict(path_being_searched, dupes):
+                if checksums_are_equal and dupes.not_in_values(path_being_searched):
                     dupes[path_being_searched].add(path)
     finally:
         comparisons_progress.end_count()
-    return Dupes(dupes, checksum_result)
-
-
-def path_not_in_dict(path_value, dictionary):
-    """Checks if a path exists within a dict's collection values."""
-    for paths in dictionary.values():
-        if path_value in paths:
-            return False
-    return True
+    return dupes
 
 
 def _search_stdin_and_stream_results(csv_labels):
