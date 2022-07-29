@@ -332,13 +332,18 @@ def checksum_files(collection_of_paths):
     return result_tuple(paths_and_sums, permission_errors)
 
 
-def checksum_files_and_show_progress(collection_of_paths):
+def checksum_files_and_show_progress(collection_of_paths, debug=False):
     """As checksum_files but prints the loop's progress to terminal."""
     checksum_progress = _ProgressCounter(
         collection_of_paths,
         text_before_counter="Reading file ",
         text_after_counter=" of {}.",
     )
+
+    # Debugging setup.
+    output_file_name = "listdupes_debug_log.txt"
+    output_path = pathlib.Path("~", output_file_name).expanduser()
+    debug_message = "Last file read was # {}, located at {}\n"
 
     result_tuple = collections.namedtuple(
         "checksum_files_return_tuple", ["paths_and_sums", "permission_errors"]
@@ -358,6 +363,9 @@ def checksum_files_and_show_progress(collection_of_paths):
                 continue
             paths_and_sums.append((file_path, checksum))
             checksum_progress.print_counter(index)
+            if debug:
+                with open(output_path, mode="w") as file:
+                    file.write(debug_message.format(index, file_path))
     finally:
         checksum_progress.end_count()
     return result_tuple(paths_and_sums, permission_errors)
@@ -387,7 +395,7 @@ def locate_dupes(checksum_result):
     return dupes
 
 
-def locate_dupes_and_show_progress(checksum_result):
+def locate_dupes_and_show_progress(checksum_result, debug=False):
     """As locate_dupes but prints the loop's progress to terminal."""
     comparisons_progress = _ProgressCounter(
         checksum_result.paths_and_sums,
@@ -395,12 +403,20 @@ def locate_dupes_and_show_progress(checksum_result):
         text_after_counter=" of {}.",
     )
 
+    # Debugging setup.
+    output_file_name = "listdupes_debug_log.txt"
+    output_path = pathlib.Path("~", output_file_name).expanduser()
+    debug_message = "Last file compared was # {}, located at {}\n"
+
     dupes = Dupes({}, checksum_result)
     try:
         comparisons_progress.print_text_for_counter()
         for index, element in enumerate(checksum_result.paths_and_sums):
             path_being_searched, checksum_being_searched = element
             comparisons_progress.print_counter(index)
+            if debug:
+                with open(output_path, mode="w") as file:
+                    file.write(debug_message.format(index, path_being_searched))
 
             for path, checksum in checksum_result.paths_and_sums[index + 1 :]:
                 checksums_are_equal = checksum_being_searched == checksum
@@ -487,6 +503,12 @@ def get_listdupes_args(overriding_args=None):
         help="Accepts a single path from the terminal.",
     )
     parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Output a debug log.",
+    )
+    parser.add_argument(
         "-f",
         "--filter",
         action="store_true",
@@ -507,7 +529,7 @@ def get_listdupes_args(overriding_args=None):
     return args
 
 
-def search_for_dupes(starting_folder, show_progress=False):
+def search_for_dupes(starting_folder, show_progress=False, log_debugging=False):
     """Searches a path and its subfolders for duplicate files.
 
     Args:
@@ -539,9 +561,11 @@ def search_for_dupes(starting_folder, show_progress=False):
         print("Gathering files...", file=sys.stderr)
         glob_module_arg = str(starting_folder) + "/**/[!.]*"
         sub_paths = glob.glob(glob_module_arg, recursive=True)
-        checksum_result = checksum_files_and_show_progress(sub_paths)
+        checksum_result = checksum_files_and_show_progress(
+            sub_paths, debug=log_debugging
+        )
         checksum_result.paths_and_sums.sort()
-        dupes = locate_dupes_and_show_progress(checksum_result)
+        dupes = locate_dupes_and_show_progress(checksum_result, debug=log_debugging)
     else:
         sub_paths = starting_folder.glob("**/[!.]*")
         checksum_result = checksum_files(sub_paths)
@@ -587,7 +611,9 @@ def main(args):
 
     # Call search_for_dupes, print its description, and return early if
     # there aren't any dupes.
-    search_result = search_for_dupes(args.starting_folder, show_progress=args.progress)
+    search_result = search_for_dupes(
+        args.starting_folder, show_progress=args.progress, log_debugging=args.debug
+    )
     print(search_result.description, file=sys.stderr)
     if not search_result.dupes:
         return result_tuple("", search_result.return_code)
