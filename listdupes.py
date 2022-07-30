@@ -26,7 +26,6 @@ __license__ = "BSD-2-Clause"
 import argparse
 import collections
 import csv
-import glob
 import pathlib
 import sys
 from zlib import crc32 as checksummer
@@ -537,9 +536,9 @@ def search_for_dupes(starting_folder, show_progress=False):
     starting_folder = unexpanded_starting_folder.expanduser()
     if show_progress:
         print("Gathering files...", file=sys.stderr)
-        glob_module_arg = str(starting_folder) + "/**/[!.]*"
-        sub_paths = glob.glob(glob_module_arg, recursive=True)
-        checksum_result = checksum_files_and_show_progress(sub_paths)
+        sub_paths = starting_folder.glob("**/[!.]*")
+        set_of_sub_paths = set(sub_paths)
+        checksum_result = checksum_files_and_show_progress(set_of_sub_paths)
         checksum_result.paths_and_sums.sort()
         dupes = locate_dupes_and_show_progress(checksum_result)
     else:
