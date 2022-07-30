@@ -531,7 +531,8 @@ def search_for_dupes(starting_folder, show_progress=False):
         return result_tuple({}, "No starting folder was provided.", 1)
 
     # Gather all files except those starting with "." and checksum them.
-    # Then compare the checksums and make a dict of duplicate files.
+    # Next compare the checksums, then make a mapping of all the paths
+    # to duplicate files and construct a Dupes object with it.
     unexpanded_starting_folder = pathlib.Path(starting_folder)
     starting_folder = unexpanded_starting_folder.expanduser()
     if show_progress:
