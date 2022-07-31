@@ -297,6 +297,38 @@ def _make_file_path_unique(path):
     raise FileExistsError("A unique path name could not be created.")
 
 
+def _make_unique_paths(files_to_make, destination=("~", "home folder")):
+    """Make unique paths and raise a helpful error if one can't be made.
+
+    Args:
+        files_to_make: A list of tuples (str, str), each containing
+            the name of a file to be created and a description of
+            its purpose to use in the creation of errors.
+        destination: A tuple (str, str) containing the root path of the
+            paths to be created and a description to use in errors.
+
+    Raises:
+        FileExistsError after 255 attempts to determine a unique path.
+
+    Returns:
+        A list of unique paths.
+    """
+
+    root_path, location = destination
+    unique_paths = []
+    for file_name, description in files_to_make:
+        path = pathlib.Path(root_path, file_name).expanduser()
+        try:
+            unique_path = _make_file_path_unique(path)
+        except FileExistsError:
+            message = (
+                f"Your {location} has a lot of {description}s. Clean up to proceed."
+            )
+            raise FileExistsError(message)
+        unique_paths.append(unique_path)
+    return unique_paths
+
+
 def checksum_files(collection_of_paths):
     """Checksums files and stores their checksums alongside their paths.
 
@@ -587,24 +619,19 @@ def main(args):
         "main_return_tuple", ["final_message", "return_code"]
     )
 
-    # Determine the eventual paths of the output file and
-    # the file which logs unread files.
+    # Determine the eventual paths of all necessary files
     # NOTE: This is done as early as possible to allow for
     # an early exit if we can't write to a drive.
-    output_file_name = "listdupes_output.csv"
-    output_path = pathlib.Path("~", output_file_name).expanduser()
+    files_to_make = [
+        ("listdupes_output.csv", "output file"),
+        ("listdupes_unread_files_log.txt", "error log"),
+    ]
     try:
-        output_path = _make_file_path_unique(output_path)
-    except FileExistsError:
-        message = "Your home folder has a lot of output files. Clean up to proceed."
+        unique_paths = _make_unique_paths(files_to_make)
+    except FileExistsError as e:
+        message = e.args[0]
         return result_tuple(message, 1)
-    unread_files_log_file_name = "listdupes_unread_files_log.txt"
-    unread_files_log_path = pathlib.Path("~", unread_files_log_file_name).expanduser()
-    try:
-        unread_files_log_path = _make_file_path_unique(unread_files_log_path)
-    except FileExistsError:
-        message = "Your home folder has a lot of error logs. Clean up to proceed."
-        return result_tuple(message, 1)
+    output_path, unread_files_log_path = unique_paths
 
     # Exit early if the path to the starting folder's invalid.
     problem_with_starting_path = _starting_path_is_invalid(args.starting_folder)
