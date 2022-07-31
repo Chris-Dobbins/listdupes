@@ -190,9 +190,8 @@ class Dupes(collections.defaultdict):
         result_tuple = collections.namedtuple(
             "search_status_return_tuple", ["description", "return_code"]
         )
-
-        # Prepare to create description value.
-        total_errors = self.checksum_result.permission_errors
+        os_errors = self.checksum_result.os_errors.values()
+        errors = 0 if not os_errors else sum([len(x) for x in os_errors])
         total = self.sum_length_of_values()
         plural = total > 1
         duplicate_s_ = "duplicates" if plural else "duplicate"
@@ -200,13 +199,13 @@ class Dupes(collections.defaultdict):
         description_of_the_result = f"{total} {duplicate_s_} {were_or_was}"
 
         # Determine what values to return.
-        if self.checksum_result.permission_errors and not self:
-            description = f"{total_errors} or more files couldn't be read."
+        if errors and not self:
+            description = f"{errors} or more files couldn't be read."
             return_code = 1
-        elif self.checksum_result.permission_errors and self:
+        elif errors and self:
             description = (
                 f"{description_of_the_result} found, however"
-                f" {total_errors} or more files couldn't be read."
+                f" {errors} or more files couldn't be read."
             )
             return_code = 1
         elif not self:
@@ -306,29 +305,38 @@ def checksum_files(collection_of_paths):
             pathlib.Path and its subclasses.
 
     Returns:
-        A named tuple (paths_and_sums, permission_errors), where
+        A named tuple (paths_and_sums, os_errors), where
         paths_and_sums is a list of tuples which contain a file path
         and the checksum integer of the corresponding file, and
-        permission_errors is an integer representing the number of
-        permission errors suppressed.
+        os_errors is a dictionary with info on suppressed os errors.
     """
 
     result_tuple = collections.namedtuple(
-        "checksum_files_return_tuple", ["paths_and_sums", "permission_errors"]
+        "checksum_files_return_tuple", ["paths_and_sums", "os_errors"]
     )
-    permission_errors = 0
+    os_errors = {
+        "permission_errors": set(),
+        "file_not_found_errors": set(),
+        "misc_errors": set(),
+    }
     paths_and_sums = []
     for file_path in collection_of_paths:
         try:
             with open(file_path, mode="rb") as file:
                 checksum = checksummer(file.read())
         except IsADirectoryError:
-            continue  # Skip directories.
-        except PermissionError:
-            permission_errors += 1
+            continue  # Skip directories. Don't count as an error.
+        except PermissionError as e:
+            os_errors["permission_errors"].add((e.filename, e.strerror))
+            continue
+        except FileNotFoundError as e:
+            os_errors["file_not_found_errors"].add((e.filename, e.strerror))
+            continue
+        except OSError as e:
+            os_errors["misc_errors"].add((e.filename, e.strerror))
             continue
         paths_and_sums.append((file_path, checksum))
-    return result_tuple(paths_and_sums, permission_errors)
+    return result_tuple(paths_and_sums, os_errors)
 
 
 def checksum_files_and_show_progress(collection_of_paths):
@@ -340,9 +348,13 @@ def checksum_files_and_show_progress(collection_of_paths):
     )
 
     result_tuple = collections.namedtuple(
-        "checksum_files_return_tuple", ["paths_and_sums", "permission_errors"]
+        "checksum_files_return_tuple", ["paths_and_sums", "os_errors"]
     )
-    permission_errors = 0
+    os_errors = {
+        "permission_errors": set(),
+        "file_not_found_errors": set(),
+        "misc_errors": set(),
+    }
     paths_and_sums = []
     try:
         checksum_progress.print_text_for_counter()
@@ -351,15 +363,21 @@ def checksum_files_and_show_progress(collection_of_paths):
                 with open(file_path, mode="rb") as file:
                     checksum = checksummer(file.read())
             except IsADirectoryError:
-                continue  # Skip directories.
-            except PermissionError:
-                permission_errors += 1
+                continue  # Skip directories. Don't count as an error.
+            except PermissionError as e:
+                os_errors["permission_errors"].add((e.filename, e.strerror))
+                continue
+            except FileNotFoundError as e:
+                os_errors["file_not_found_errors"].add((e.filename, e.strerror))
+                continue
+            except OSError as e:
+                os_errors["misc_errors"].add((e.filename, e.strerror))
                 continue
             paths_and_sums.append((file_path, checksum))
             checksum_progress.print_counter(index)
     finally:
         checksum_progress.end_count()
-    return result_tuple(paths_and_sums, permission_errors)
+    return result_tuple(paths_and_sums, os_errors)
 
 
 def locate_dupes(checksum_result):
@@ -432,6 +450,14 @@ def _search_stdin_and_stream_results(csv_labels):
         )
         return_codes.append(search_result.return_code)
     return return_codes
+
+
+def _write_suppressed_errors_log(file_path, suppressed_errors):
+    """Write out a dict of suppressed errors as a text file."""
+    with open(file_path, mode="x", encoding="utf-8", errors="replace") as file:
+        for value in suppressed_errors.values():
+            for path, error in value:
+                file.write(f"'{path}' raised '{error}' and was not read.\n")
 
 
 def _handle_exception_at_write_time(exception_info):
@@ -561,7 +587,8 @@ def main(args):
         "main_return_tuple", ["final_message", "return_code"]
     )
 
-    # Determine the output's eventual file path.
+    # Determine the eventual paths of the output file and
+    # the file which logs unread files.
     # NOTE: This is done as early as possible to allow for
     # an early exit if we can't write to a drive.
     output_file_name = "listdupes_output.csv"
@@ -570,6 +597,13 @@ def main(args):
         output_path = _make_file_path_unique(output_path)
     except FileExistsError:
         message = "Your home folder has a lot of output files. Clean up to proceed."
+        return result_tuple(message, 1)
+    unread_files_log_file_name = "listdupes_unread_files_log.txt"
+    unread_files_log_path = pathlib.Path("~", unread_files_log_file_name).expanduser()
+    try:
+        unread_files_log_path = _make_file_path_unique(unread_files_log_path)
+    except FileExistsError:
+        message = "Your home folder has a lot of error logs. Clean up to proceed."
         return result_tuple(message, 1)
 
     # Exit early if the path to the starting folder's invalid.
@@ -595,6 +629,8 @@ def main(args):
     # Format the duplicate paths as a CSV and write it to a file.
     try:
         search_result.dupes.write_to_csv(output_path, csv_column_labels)
+        os_errors = search_result.dupes.checksum_result.os_errors
+        _write_suppressed_errors_log(unread_files_log_path, os_errors)
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
