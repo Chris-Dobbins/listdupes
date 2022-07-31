@@ -33,7 +33,7 @@ from zlib import crc32 as checksummer
 
 # Classes
 class _Cursor:
-    """Provides structure to subclasses which write to terminal."""
+    """The terminal's cursor."""
 
     hide_cursor = "\x1b[?25l"  # Terminal escape codes.
     show_cursor = "\x1b[?25h"
@@ -50,7 +50,7 @@ class _Cursor:
 
 
 class _ProgressCounter(_Cursor):
-    """Methods for printing the state of an iteration to a terminal."""
+    """A counter displaying an iteration's progress on the terminal."""
 
     def __init__(
         self,
@@ -227,10 +227,10 @@ class Dupes(collections.defaultdict):
     def write_to_csv(
         self, file, labels, encoding="utf-8", errors="replace", mode="x", **kwargs
     ):
-        """Writes out the contents of a dict as an Excel style CSV.
+        """Write out the contents of a dict as an Excel-style CSV.
 
         Args:
-            output_file: A path-like object or an integer file description.
+            output_file: A path-like object or integer file descriptor.
             labels: A iterable of strings or numbers which are written
                 once as the first row of the file. To omit the label row
                 pass []. To print a blank row pass ['', ''].
@@ -274,7 +274,7 @@ def _starting_path_is_invalid(path):
 
 
 def _make_file_path_unique(path):
-    """Makes a similarly named path object if a path already exists.
+    """Make a similarly named path object if a path already exists.
 
     Args:
         path: An instance of pathlib.Path or its subclasses.
@@ -306,6 +306,7 @@ def _make_unique_paths(files_to_make, destination=("~", "home folder")):
             its purpose to use in the creation of errors.
         destination: A tuple (str, str) containing the root path of the
             paths to be created and a description to use in errors.
+            Defaults to the user's home folder.
 
     Raises:
         FileExistsError after 255 attempts to determine a unique path.
@@ -330,17 +331,16 @@ def _make_unique_paths(files_to_make, destination=("~", "home folder")):
 
 
 def checksum_files(collection_of_paths):
-    """Checksums files and stores their checksums alongside their paths.
+    """Checksum files and stores their checksums alongside their paths.
 
     Args:
-        collection_of_paths: A collection of strings, or instances of
-            pathlib.Path and its subclasses.
+        collection_of_paths: A collection of path-like objects.
 
     Returns:
         A named tuple (paths_and_sums, os_errors), where
-        paths_and_sums is a list of tuples which contain a file path
-        and the checksum integer of the corresponding file, and
-        os_errors is a dictionary with info on suppressed os errors.
+        paths_and_sums is a list of tuples which contain a path-like
+        object and the checksum integer of the corresponding file,
+        and os_errors is a dictionary with info on suppressed os errors.
     """
 
     result_tuple = collections.namedtuple(
@@ -372,7 +372,7 @@ def checksum_files(collection_of_paths):
 
 
 def checksum_files_and_show_progress(collection_of_paths):
-    """As checksum_files but prints the loop's progress to terminal."""
+    """As checksum_files but print the loop's progress to terminal."""
     checksum_progress = _ProgressCounter(
         collection_of_paths,
         text_before_counter="Reading file ",
@@ -413,11 +413,11 @@ def checksum_files_and_show_progress(collection_of_paths):
 
 
 def locate_dupes(checksum_result):
-    """Locates duplicate files by comparing their checksums.
+    """Locate duplicate files by comparing their checksums.
 
     Args:
-        checksum_result: A list of tuples, each containing a file
-            path and the checksum of the associated file.
+        checksum_result: A list of tuples, each containing a path-like
+            object and the checksum of the associated file.
 
     Returns:
         A Dupes object containing path keys which are mapped to sets of
@@ -437,7 +437,7 @@ def locate_dupes(checksum_result):
 
 
 def locate_dupes_and_show_progress(checksum_result):
-    """As locate_dupes but prints the loop's progress to terminal."""
+    """As locate_dupes but print the loop's progress to terminal."""
     comparisons_progress = _ProgressCounter(
         checksum_result.paths_and_sums,
         text_before_counter="Comparing file ",
@@ -493,7 +493,7 @@ def _write_suppressed_errors_log(file_path, suppressed_errors):
 
 
 def _handle_exception_at_write_time(exception_info):
-    """Prints a message and the exception's traceback. Doesn't exit."""
+    """Print a message and the exception's traceback without exiting."""
     error_message = (
         "An error prevented the app from saving its results.\n"
         "To recover the results copy the text below into an empty\n"
@@ -506,14 +506,7 @@ def _handle_exception_at_write_time(exception_info):
 
 
 def get_listdupes_args(overriding_args=None):
-    """Parses arguments with the argparse module and returns the result.
-
-    By default it parses the arguments passed to sys.argv.
-    Optionally it can parse a different set of arguments,
-    effectively overriding sys.argv. The returned object uses the
-    arguments's long names as attributes, with each attribute holding
-    the result of parsing that argument.
-    E.g. args.progress contains the value of the --progress argument.
+    """Parse arguments with the argparse module and return the result.
 
     Args:
         overriding_args: Accepts a list of strings to parse.
@@ -522,7 +515,10 @@ def get_listdupes_args(overriding_args=None):
             taking its arguments from sys.argv.
 
     Returns:
-        An argparse.Namespace object with the app's arguments.
+        An argparse.Namespace object containing the app's arguments.
+        The object uses the arguments's long names as attributes,
+        with each attribute holding the result of parsing that argument.
+        E.g. args.progress holds the value of the --progress argument.
     """
 
     parser = argparse.ArgumentParser(
@@ -565,11 +561,11 @@ def get_listdupes_args(overriding_args=None):
 
 
 def search_for_dupes(starting_folder, show_progress=False):
-    """Searches a path and its subfolders for duplicate files.
+    """Search a path and its subfolders for duplicate files.
 
     Args:
-        starting_folder: A string of the path to recursively search for
-            duplicate files.
+        starting_folder: A path-like object of the path to recursively
+            search for duplicate files.
         show_progress: A bool indicating whether to display the progress
             of checksumming and comparison processes. Defaults to False.
 
