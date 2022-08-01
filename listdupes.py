@@ -655,14 +655,18 @@ def main(args):
     # Format the duplicate paths as a CSV and write it to a file.
     try:
         search_result.dupes.write_to_csv(output_path, csv_column_labels)
-        os_errors = search_result.dupes.checksum_result.os_errors
-        _write_suppressed_errors_log(unread_files_log_path, os_errors)
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         _handle_exception_at_write_time(sys.exc_info())
         search_result.dupes.write_to_csv(sys.stdout.fileno(), csv_column_labels)
         return result_tuple("", 1)
+
+    # Write an unread files log if needed.
+    # TODO: Handle any exceptions.
+    os_errors = search_result.dupes.checksum_result.os_errors
+    if any(os_errors.values()):
+        _write_suppressed_errors_log(unread_files_log_path, os_errors)
 
     message = f"The list of duplicates has been saved to {output_path.parent}."
     return result_tuple(message, search_result.return_code)
