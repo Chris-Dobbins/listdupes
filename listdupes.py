@@ -17,7 +17,7 @@ __all__ = [
     "main",
     "search_for_dupes",
 ]
-__version__ = "6.0.0-alpha.4"
+__version__ = "6.0.0-alpha.5"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
