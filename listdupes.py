@@ -330,8 +330,36 @@ def _make_unique_paths(files_to_make, destination=("~", "home folder")):
     return unique_paths
 
 
+def _checksum_file_and_store_outcome(file_path, results_container, errors_container):
+    """Checksum a file, storing the result or error via side-effect.
+
+    Args:
+        file_path: A path-like object.
+        results_container: A list for storing tuples of
+            (path-like object, int) which hold a file path alongside
+            a checksum of the associated file.
+        errors_container: A dict with keys for commonly raised errors.
+    """
+
+    try:
+        with open(file_path, mode="rb") as file:
+            checksum = checksummer(file.read())
+    except IsADirectoryError:
+        return  # Don't count a directory as an error, just move on.
+    except PermissionError as e:
+        errors_container["permission_errors"].add((e.filename, e.strerror))
+        return
+    except FileNotFoundError as e:
+        errors_container["file_not_found_errors"].add((e.filename, e.strerror))
+        return
+    except OSError as e:
+        errors_container["misc_errors"].add((e.filename, e.strerror))
+        return
+    results_container.append((file_path, checksum))
+
+
 def checksum_files(collection_of_paths):
-    """Checksum files and stores their checksums alongside their paths.
+    """Checksum files and return their paths, checksums, and errors.
 
     Args:
         collection_of_paths: A collection of path-like objects.
@@ -339,7 +367,7 @@ def checksum_files(collection_of_paths):
     Returns:
         A named tuple (paths_and_sums, os_errors), where
         paths_and_sums is a list of tuples which contain a path-like
-        object and the checksum integer of the corresponding file,
+        object and the checksum integer of the associated file,
         and os_errors is a dictionary with info on suppressed os errors.
     """
 
@@ -353,21 +381,7 @@ def checksum_files(collection_of_paths):
     }
     paths_and_sums = []
     for file_path in collection_of_paths:
-        try:
-            with open(file_path, mode="rb") as file:
-                checksum = checksummer(file.read())
-        except IsADirectoryError:
-            continue  # Skip directories. Don't count as an error.
-        except PermissionError as e:
-            os_errors["permission_errors"].add((e.filename, e.strerror))
-            continue
-        except FileNotFoundError as e:
-            os_errors["file_not_found_errors"].add((e.filename, e.strerror))
-            continue
-        except OSError as e:
-            os_errors["misc_errors"].add((e.filename, e.strerror))
-            continue
-        paths_and_sums.append((file_path, checksum))
+        _checksum_file_and_store_outcome(file_path, paths_and_sums, os_errors)
     return result_tuple(paths_and_sums, os_errors)
 
 
@@ -391,21 +405,7 @@ def checksum_files_and_show_progress(collection_of_paths):
     try:
         checksum_progress.print_text_for_counter()
         for index, file_path in enumerate(collection_of_paths):
-            try:
-                with open(file_path, mode="rb") as file:
-                    checksum = checksummer(file.read())
-            except IsADirectoryError:
-                continue  # Skip directories. Don't count as an error.
-            except PermissionError as e:
-                os_errors["permission_errors"].add((e.filename, e.strerror))
-                continue
-            except FileNotFoundError as e:
-                os_errors["file_not_found_errors"].add((e.filename, e.strerror))
-                continue
-            except OSError as e:
-                os_errors["misc_errors"].add((e.filename, e.strerror))
-                continue
-            paths_and_sums.append((file_path, checksum))
+            _checksum_file_and_store_outcome(file_path, paths_and_sums, os_errors)
             checksum_progress.print_counter(index)
     finally:
         checksum_progress.end_count()
