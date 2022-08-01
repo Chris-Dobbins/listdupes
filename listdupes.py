@@ -172,11 +172,9 @@ class Dupes(collections.defaultdict):
         return True
 
     def sort_values(self, sort_key=None):
-        """Convert collections to lists and sort them in place."""
+        """Convert collections to sorted lists."""
         for dict_key in self.keys():
-            list_of_values = list(self[dict_key])
-            list_of_values.sort(key=sort_key)
-            self[dict_key] = list_of_values
+            self[dict_key] = sorted(self[dict_key], key=sort_key)
 
     def status(self):
         """Describe the dupes and errors found and assign a return code.
@@ -358,11 +356,13 @@ def _checksum_file_and_store_outcome(file_path, results_container, errors_contai
     results_container.append((file_path, checksum))
 
 
-def checksum_files(collection_of_paths):
+def checksum_files(collection_of_paths, sort_key=None):
     """Checksum files and return their paths, checksums, and errors.
 
     Args:
         collection_of_paths: A collection of path-like objects.
+        sort_key: A function for sorting the returned collections.
+            The default of None dictates an ascending sort.
 
     Returns:
         A named tuple (paths_and_sums, os_errors), where
@@ -382,10 +382,12 @@ def checksum_files(collection_of_paths):
     paths_and_sums = []
     for file_path in collection_of_paths:
         _checksum_file_and_store_outcome(file_path, paths_and_sums, os_errors)
+    paths_and_sums.sort(key=sort_key)
+    os_errors = {k: sorted(v, key=sort_key) for k, v in os_errors.items()}
     return result_tuple(paths_and_sums, os_errors)
 
 
-def checksum_files_and_show_progress(collection_of_paths):
+def checksum_files_and_show_progress(collection_of_paths, sort_key=None):
     """As checksum_files but print the loop's progress to terminal."""
     checksum_progress = _ProgressCounter(
         collection_of_paths,
@@ -409,18 +411,22 @@ def checksum_files_and_show_progress(collection_of_paths):
             checksum_progress.print_counter(index)
     finally:
         checksum_progress.end_count()
+    paths_and_sums.sort(key=sort_key)
+    os_errors = {k: sorted(v, key=sort_key) for k, v in os_errors.items()}
     return result_tuple(paths_and_sums, os_errors)
 
 
-def locate_dupes(checksum_result):
+def locate_dupes(checksum_result, sort_key=None):
     """Locate duplicate files by comparing their checksums.
 
     Args:
         checksum_result: A list of tuples, each containing a path-like
             object and the checksum of the associated file.
+        sort_key: A function for sorting the return value's
+            collections. The default of None dictates an ascending sort.
 
     Returns:
-        A Dupes object containing path keys which are mapped to sets of
+        A Dupes object containing path keys which are mapped to lists of
         paths whose associated checksums match the checksum associated
         with their path keys. Never contains a path more than once.
     """
@@ -433,10 +439,11 @@ def locate_dupes(checksum_result):
             checksums_are_equal = checksum_being_searched == checksum
             if checksums_are_equal and dupes.not_in_values(path_being_searched):
                 dupes[path_being_searched].add(path)
+    dupes.sort_values(sort_key=sort_key)
     return dupes
 
 
-def locate_dupes_and_show_progress(checksum_result):
+def locate_dupes_and_show_progress(checksum_result, sort_key=None):
     """As locate_dupes but print the loop's progress to terminal."""
     comparisons_progress = _ProgressCounter(
         checksum_result.paths_and_sums,
@@ -457,6 +464,7 @@ def locate_dupes_and_show_progress(checksum_result):
                     dupes[path_being_searched].add(path)
     finally:
         comparisons_progress.end_count()
+    dupes.sort_values(sort_key=sort_key)
     return dupes
 
 
@@ -571,9 +579,9 @@ def search_for_dupes(starting_folder, show_progress=False):
 
     Returns:
         A named tuple (dupes, description, return_code), where dupes is
-        a Dupes object (As per the return value of locate_dupes but with
-        its sets sorted into lists), and description and return_code are
-        a string and an integer as per the return of Dupes.status().
+        a Dupes object (As per the return value of locate_dupes), and
+        description and return_code are a string and an integer as per
+        the return of Dupes.status().
     """
 
     result_tuple = collections.namedtuple(
@@ -594,16 +602,11 @@ def search_for_dupes(starting_folder, show_progress=False):
         sub_paths = starting_folder.glob("**/[!.]*")
         set_of_sub_paths = set(sub_paths)
         checksum_result = checksum_files_and_show_progress(set_of_sub_paths)
-        checksum_result.paths_and_sums.sort()
         dupes = locate_dupes_and_show_progress(checksum_result)
     else:
         sub_paths = starting_folder.glob("**/[!.]*")
         checksum_result = checksum_files(sub_paths)
-        checksum_result.paths_and_sums.sort()
         dupes = locate_dupes(checksum_result)
-
-    # Sort the duplicates to prepare them for output.
-    dupes.sort_values()
 
     search_status = dupes.status()
     return result_tuple(dupes, search_status.description, search_status.return_code)
