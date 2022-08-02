@@ -491,22 +491,23 @@ def _search_stdin_and_stream_results(csv_labels, unread_files_log_path):
         search_result.dupes.write_to_csv(
             sys.stdout.fileno(), csv_labels_arg, closefd=False
         )
-
-        # TODO: Write a function for this.
         os_errors = search_result.dupes.checksum_result.os_errors
-        if any(os_errors.values()):
-            _write_suppressed_errors_log(unread_files_log_path, os_errors)
-
+        _write_any_errors_to_a_log(unread_files_log_path, os_errors, mode="a")
         return_codes.append(search_result.return_code)
     return return_codes
 
 
-def _write_suppressed_errors_log(file_path, suppressed_errors):
-    """Write out a dict of suppressed errors as a text file."""
-    with open(file_path, mode="x", encoding="utf-8", errors="replace") as file:
-        for value in suppressed_errors.values():
+def _write_any_errors_to_a_log(
+    file_path, error_mapping, encoding="utf-8", errors="replace", mode="x", **kwargs
+):
+    """If a mapping of errors has any values log them in a text file."""
+    if not any(error_mapping.values()):
+        return None
+    with open(file_path, mode=mode, encoding=encoding, errors=errors, **kwargs) as file:
+        for value in error_mapping.values():
             for path, error in value:
                 file.write(f"'{path}' raised '{error}' and was not read.\n")
+    return None
 
 
 def _handle_exception_at_write_time(exception_info):
@@ -674,10 +675,11 @@ def main(args):
         return result_tuple("", 1)
 
     # Write an unread files log if needed.
-    # TODO: Handle any exceptions.
     os_errors = search_result.dupes.checksum_result.os_errors
-    if any(os_errors.values()):
-        _write_suppressed_errors_log(unread_files_log_path, os_errors)
+    try:
+        _write_any_errors_to_a_log(unread_files_log_path, os_errors)
+    except Exception:
+        print("A log of the unread files couldn't be written.", file=sys.stderr)
 
     message = f"The list of duplicates has been saved to {output_path.parent}."
     return result_tuple(message, search_result.return_code)
