@@ -216,11 +216,9 @@ class Dupes(collections.defaultdict):
         return result_tuple(description, return_code)
 
     def sum_length_of_values(self):
-        """Sum the lengths of all a dict's values and return the sum"""
-        sum_total_length = 0
-        for dict_value in self.values():
-            sum_total_length += len(dict_value)
-        return sum_total_length
+        """Sum the lengths of an instance's values and return the sum."""
+        sum_of_lengths = sum([len(mapped_value) for mapped_value in self.values()])
+        return sum_of_lengths
 
     def write_to_csv(
         self, file, labels, encoding="utf-8", errors="replace", mode="x", **kwargs
