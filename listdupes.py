@@ -466,7 +466,7 @@ def locate_dupes_and_show_progress(checksum_result, sort_key=None):
     return dupes
 
 
-def _search_stdin_and_stream_results(csv_labels):
+def _search_stdin_and_stream_results(csv_labels, unread_files_log_path):
     """Search paths from stdin for dupes and stream results to stdout.
 
     Args:
@@ -480,12 +480,23 @@ def _search_stdin_and_stream_results(csv_labels):
 
     return_codes = []
     for index, line in enumerate(sys.stdin):
-        search_result = search_for_dupes(line.rstrip(), show_progress=args.progress)
+        path = pathlib.Path(line.rstrip()).expanduser()
+        problem_with_starting_path = _starting_path_is_invalid(path)
+        if problem_with_starting_path:
+            return_codes.append(1)
+            continue
+        search_result = search_for_dupes(path, show_progress=args.progress)
         csv_labels_arg = [] if index > 0 else csv_labels
         # The fd is kept open so writes append.
         search_result.dupes.write_to_csv(
             sys.stdout.fileno(), csv_labels_arg, closefd=False
         )
+
+        # TODO: Write a function for this.
+        os_errors = search_result.dupes.checksum_result.os_errors
+        if any(os_errors.values()):
+            _write_suppressed_errors_log(unread_files_log_path, os_errors)
+
         return_codes.append(search_result.return_code)
     return return_codes
 
@@ -630,18 +641,20 @@ def main(args):
         return result_tuple(message, 1)
     output_path, unread_files_log_path = unique_paths
 
-    # Exit early if the path to the starting folder's invalid.
-    problem_with_starting_path = _starting_path_is_invalid(args.starting_folder)
-    if problem_with_starting_path:
-        return result_tuple(problem_with_starting_path, 1)
-
     csv_column_labels = ["File", "Duplicates"]
 
     if args.filter:
         if args.progress:
             print("Processing input stream...", file=sys.stderr)
-        return_codes_from_search = _search_stdin_and_stream_results(csv_column_labels)
+        return_codes_from_search = _search_stdin_and_stream_results(
+            csv_column_labels, unread_files_log_path
+        )
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
+
+    # Exit early if the path to the starting folder's invalid.
+    problem_with_starting_path = _starting_path_is_invalid(args.starting_folder)
+    if problem_with_starting_path:
+        return result_tuple(problem_with_starting_path, 1)
 
     # Call search_for_dupes, print its description, and return early if
     # there aren't any dupes.
