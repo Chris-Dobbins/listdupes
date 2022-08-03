@@ -197,7 +197,10 @@ class Dupes(collections.defaultdict):
 
         # Determine what values to return.
         if errors and not self:
-            description = f"{errors} or more files couldn't be read."
+            description = (
+                "No duplicates were found, however"
+                f" {errors} or more files couldn't be read."
+            )
             return_code = 1
         elif errors and self:
             description = (
