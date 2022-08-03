@@ -633,7 +633,27 @@ def search_for_dupes(starting_folder, show_progress=False):
 
 
 def main(overriding_args=None):
-    """The functionality of the listdupes command-line app."""
+    """The functionality of the listdupes command-line app.
+
+    Args:
+        overriding_args: A list of strings to be passed to
+            _get_listdupes_args() and parsed as arguments. When the
+            value is None (As it is by default) that function parses
+            the arguments from sys.argv.
+
+    Returns:
+        A named tuple (final_message, return_code), where final_message
+        is a string describing either the number of dupes and errors or
+        the reason for exiting early, and return_code is an integer.
+
+        Code 0 indicates full success. Code 1 indicates either
+        an early exit on an error, or a partial check for dupes
+        in which read errors occurred. Code 3 indicates that
+        one or more starting folders processed with the --filter flag
+        did not fully succeed.
+    """
+
+    # Initial set-up.
     result_tuple = collections.namedtuple(
         "main_return_tuple", ["final_message", "return_code"]
     )
