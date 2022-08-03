@@ -11,7 +11,6 @@ __all__ = [
     "checksum_files",
     "checksum_files_and_show_progress",
     "Dupes",
-    "get_listdupes_args",
     "locate_dupes",
     "locate_dupes_and_show_progress",
     "main",
@@ -466,18 +465,26 @@ def locate_dupes_and_show_progress(checksum_result, sort_key=None):
     return dupes
 
 
-def _search_stdin_and_stream_results(csv_labels, unread_files_log_path):
+def _search_stdin_and_stream_results(
+    csv_labels, unread_files_log_path, show_progress=False
+):
     """Search paths from stdin for dupes and stream results to stdout.
 
     Args:
         csv_labels: A iterable of strings or numbers which are written
             once as the first row of the file. To omit the label row
             pass []. To print a blank row pass ['', ''].
+        unread_files_log_path: A path-like object giving the location
+            to log suppressed read-errors to.
+        show_progress: A bool indicating whether to display the progress
+            of checksumming and comparison processes. Defaults to False.
 
     Returns:
         A list of return codes produced by the search_for_dupes calls.
     """
 
+    if show_progress:
+        print("Processing input stream...", file=sys.stderr)
     return_codes = []
     for index, line in enumerate(sys.stdin):
         path = pathlib.Path(line.rstrip()).expanduser()
@@ -485,7 +492,7 @@ def _search_stdin_and_stream_results(csv_labels, unread_files_log_path):
         if problem_with_starting_path:
             return_codes.append(1)
             continue
-        search_result = search_for_dupes(path, show_progress=args.progress)
+        search_result = search_for_dupes(path, show_progress=show_progress)
         csv_labels_arg = [] if index > 0 else csv_labels
         # The fd is kept open so writes append.
         search_result.dupes.write_to_csv(
@@ -523,7 +530,7 @@ def _handle_exception_at_write_time(exception_info):
     print(style_magenta, error_message, reset_style, sep="", file=sys.stderr)
 
 
-def get_listdupes_args(overriding_args=None):
+def _get_listdupes_args(overriding_args=None):
     """Parse arguments with the argparse module and return the result.
 
     Args:
@@ -622,11 +629,13 @@ def search_for_dupes(starting_folder, show_progress=False):
     return result_tuple(dupes, search_status.description, search_status.return_code)
 
 
-def main(args):
+def main(overriding_args=None):
     """The functionality of the listdupes command-line app."""
     result_tuple = collections.namedtuple(
         "main_return_tuple", ["final_message", "return_code"]
     )
+    args = _get_listdupes_args(overriding_args)  # This can exit with 2.
+    csv_column_labels = ["File", "Duplicates"]
 
     # Determine the eventual paths of all necessary files
     # NOTE: This is done as early as possible to allow for
@@ -642,13 +651,9 @@ def main(args):
         return result_tuple(message, 1)
     output_path, unread_files_log_path = unique_paths
 
-    csv_column_labels = ["File", "Duplicates"]
-
     if args.filter:
-        if args.progress:
-            print("Processing input stream...", file=sys.stderr)
         return_codes_from_search = _search_stdin_and_stream_results(
-            csv_column_labels, unread_files_log_path
+            csv_column_labels, unread_files_log_path, show_progress=args.progress
         )
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
@@ -687,8 +692,7 @@ def main(args):
 
 # Run the app!
 if __name__ == "__main__":
-    args = get_listdupes_args()  # The parser can exit with 2.
-    main_result = main(args)
+    main_result = main()
     if main_result.final_message:
         print(main_result.final_message, file=sys.stderr)
     sys.exit(main_result.return_code)
