@@ -658,6 +658,7 @@ def main(overriding_args=None):
         "main_return_tuple", ["final_message", "return_code"]
     )
     args = _get_listdupes_args(overriding_args)  # This can exit with 2.
+    traditional_unix_stdin_arg = pathlib.Path("-")
     csv_column_labels = ["File", "Duplicates"]
 
     # Determine the eventual paths of all necessary files
@@ -674,7 +675,7 @@ def main(overriding_args=None):
         return result_tuple(message, 1)
     output_path, unread_files_log_path = unique_paths
 
-    if args.filter:
+    if args.filter or args.starting_folder == traditional_unix_stdin_arg:
         return_codes_from_search = _search_stdin_and_stream_results(
             csv_column_labels, unread_files_log_path, show_progress=args.progress
         )
