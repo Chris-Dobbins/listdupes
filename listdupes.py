@@ -685,10 +685,18 @@ def main(overriding_args=None):
     if problem_with_starting_path:
         return result_tuple(problem_with_starting_path, 1)
 
-    # Call search_for_dupes, print its description, and return early if
-    # there aren't any dupes.
+    # Search for dupes and describe the result to the user.
     search_result = search_for_dupes(args.starting_folder, show_progress=args.progress)
+    os_errors = search_result.dupes.checksum_result.os_errors
     print(search_result.description, file=sys.stderr)
+
+    # Write an unread files log if needed.
+    try:
+        _write_any_errors_to_a_log(unread_files_log_path, os_errors)
+    except Exception:
+        print("A log of the unread files couldn't be written.", file=sys.stderr)
+
+    # Return without writing an output file if no dupes are found.
     if not search_result.dupes:
         return result_tuple("", search_result.return_code)
 
@@ -701,13 +709,6 @@ def main(overriding_args=None):
         _handle_exception_at_write_time(sys.exc_info())
         search_result.dupes.write_to_csv(sys.stdout.fileno(), csv_column_labels)
         return result_tuple("", 1)
-
-    # Write an unread files log if needed.
-    os_errors = search_result.dupes.checksum_result.os_errors
-    try:
-        _write_any_errors_to_a_log(unread_files_log_path, os_errors)
-    except Exception:
-        print("A log of the unread files couldn't be written.", file=sys.stderr)
 
     message = f"The list of duplicates has been saved to {output_path.parent}."
     return result_tuple(message, search_result.return_code)
