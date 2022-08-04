@@ -669,11 +669,10 @@ def main(overriding_args=None):
         ("listdupes_unread_files_log.txt", "error log"),
     ]
     try:
-        unique_paths = _make_unique_paths(files_to_make)
+        output_path, unread_files_log_path = _make_unique_paths(files_to_make)
     except FileExistsError as e:
         message = e.args[0]
         return result_tuple(message, 1)
-    output_path, unread_files_log_path = unique_paths
 
     if args.filter or args.starting_folder == traditional_unix_stdin_arg:
         return_codes_from_search = _search_stdin_and_stream_results(
