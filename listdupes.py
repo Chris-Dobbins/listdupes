@@ -661,7 +661,7 @@ def main(overriding_args=None):
     traditional_unix_stdin_arg = pathlib.Path("-")
     csv_column_labels = ["File", "Duplicates"]
 
-    # Determine the eventual paths of all necessary files
+    # Determine the eventual paths of all necessary files.
     # NOTE: This is done as early as possible to allow for
     # an early exit if we can't write to a drive.
     files_to_make = [
