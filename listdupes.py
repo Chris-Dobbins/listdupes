@@ -222,7 +222,7 @@ class Dupes(collections.defaultdict):
         sum_of_lengths = sum([len(mapped_value) for mapped_value in self.values()])
         return sum_of_lengths
 
-    def write_to_csv(
+    def write_any_items_to(
         self, file, labels, encoding="utf-8", errors="replace", mode="x", **kwargs
     ):
         """Write out the contents of a dict as an Excel-style CSV.
@@ -237,7 +237,8 @@ class Dupes(collections.defaultdict):
             mode: Passed to the open function. Defaults to 'x'.
             **kwargs: Passed to the open function.
         """
-
+        if not any(self.values()):
+            return None
         with open(
             file, encoding=encoding, mode=mode, errors=errors, **kwargs
         ) as csv_file:
@@ -498,7 +499,7 @@ def _search_stdin_and_stream_results(
         search_result = search_for_dupes(path, show_progress=show_progress)
         csv_labels_arg = [] if index > 0 else csv_labels
         # The fd is kept open so writes append.
-        search_result.dupes.write_to_csv(
+        search_result.dupes.write_any_items_to(
             sys.stdout.fileno(), csv_labels_arg, closefd=False
         )
         os_errors = search_result.dupes.checksum_result.os_errors
@@ -696,21 +697,18 @@ def main(overriding_args=None):
     except Exception:
         print("A log of the unread files couldn't be written.", file=sys.stderr)
 
-    # Return without writing an output file if no dupes are found.
-    if not search_result.dupes:
-        return result_tuple("", search_result.return_code)
-
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        search_result.dupes.write_to_csv(output_path, csv_column_labels)
+        search_result.dupes.write_any_items_to(output_path, csv_column_labels)
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         _handle_exception_at_write_time(sys.exc_info())
-        search_result.dupes.write_to_csv(sys.stdout.fileno(), csv_column_labels)
+        search_result.dupes.write_any_items_to(sys.stdout.fileno(), csv_column_labels)
         return result_tuple("", 1)
 
-    message = f"The list of duplicates has been saved to {output_path.parent}."
+    save_description = f"The list of duplicates has been saved to {output_path.parent}."
+    message = "" if not search_result.dupes else save_description
     return result_tuple(message, search_result.return_code)
 
 
