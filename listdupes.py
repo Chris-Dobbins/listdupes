@@ -503,12 +503,12 @@ def _search_stdin_and_stream_results(
             sys.stdout.fileno(), csv_labels_arg, closefd=False
         )
         os_errors = search_result.dupes.checksum_result.os_errors
-        _write_any_errors_to_a_log(unread_files_log_path, os_errors, mode="a")
+        _write_any_errors_to(unread_files_log_path, os_errors, mode="a")
         return_codes.append(search_result.return_code)
     return return_codes
 
 
-def _write_any_errors_to_a_log(
+def _write_any_errors_to(
     file_path, error_mapping, encoding="utf-8", errors="replace", mode="x", **kwargs
 ):
     """If a mapping of errors has any values log them in a text file."""
@@ -693,7 +693,7 @@ def main(overriding_args=None):
 
     # Write an unread files log if needed.
     try:
-        _write_any_errors_to_a_log(unread_files_log_path, os_errors)
+        _write_any_errors_to(unread_files_log_path, os_errors)
     except Exception:
         print("A log of the unread files couldn't be written.", file=sys.stderr)
 
