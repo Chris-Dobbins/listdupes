@@ -25,6 +25,7 @@ __license__ = "BSD-2-Clause"
 import argparse
 import collections
 import csv
+import json
 import pathlib
 import sys
 from zlib import crc32 as checksummer
@@ -223,22 +224,50 @@ class Dupes(collections.defaultdict):
         return sum_of_lengths
 
     def write_any_items_to(
-        self, file, labels, encoding="utf-8", errors="replace", mode="x", **kwargs
+        self, file, format="csv", encoding="utf-8", errors="replace", mode="x", **kwargs
     ):
-        """Write out the contents of a dict as an Excel-style CSV.
+        """Write the contents of the mapping to a file.
+
+        The write is skipped if the mapping contains no duplicate files.
+
+        Args:
+            output_file: A path-like object or integer file descriptor.
+            format: A string specifying the format to be written.
+                Defaults to 'csv'.
+            encoding: Passed to the writer. Defaults to 'utf-8'.
+            errors: Passed to the writer. Defaults to 'replace'.
+            mode: Passed to the writer. Defaults to 'x'.
+            **kwargs: Passed to open().
+        """
+
+        if not any(self.values()):
+            return None
+        writer = {"csv": self.write_to_csv, "json": self.write_to_json}
+        writer[format](file, encoding=encoding, mode=mode, errors=errors, **kwargs)
+
+    def write_to_csv(
+        self,
+        file,
+        labels=["File", "Duplicates"],
+        encoding="utf-8",
+        errors="replace",
+        mode="x",
+        **kwargs,
+    ):
+        """Write the contents of the mapping as an Excel-style CSV.
 
         Args:
             output_file: A path-like object or integer file descriptor.
             labels: A iterable of strings or numbers which are written
                 once as the first row of the file. To omit the label row
-                pass []. To print a blank row pass ['', ''].
-            encoding: Passed to the open function. Defaults to 'utf-8'.
-            errors: Passed to the open function. Defaults to 'replace'.
-            mode: Passed to the open function. Defaults to 'x'.
-            **kwargs: Passed to the open function.
+                pass []. To print a blank row pass ['', '']. The default
+                is ['File', 'Duplicates']
+            encoding: Passed to open(). Defaults to 'utf-8'.
+            errors: Passed to open(). Defaults to 'replace'.
+            mode: Passed to open(). Defaults to 'x'.
+            **kwargs: Passed to open().
         """
-        if not any(self.values()):
-            return None
+
         with open(
             file, encoding=encoding, mode=mode, errors=errors, **kwargs
         ) as csv_file:
@@ -251,6 +280,25 @@ class Dupes(collections.defaultdict):
                 if len(duplicates_list) > 1:
                     for duplicate in duplicates_list[1:]:
                         writer.writerow(["", duplicate])
+
+    def write_to_json(
+        self, file, encoding="utf-8", errors="replace", mode="x", **kwargs
+    ):
+        """Write the contents of the mapping as a JSON.
+
+        Args:
+            output_file: A path-like object or integer file descriptor.
+            encoding: Passed to open(). Defaults to 'utf-8'.
+            errors: Passed to open(). Defaults to 'replace'.
+            mode: Passed to open(). Defaults to 'x'.
+            **kwargs: Passed to open().
+        """
+
+        json_safe_dict = {str(k): [str(path) for path in v] for k, v in self.items()}
+        with open(
+            file, encoding=encoding, mode=mode, errors=errors, **kwargs
+        ) as json_file:
+            json.dump(json_safe_dict, json_file)
 
 
 # Functions
@@ -470,18 +518,19 @@ def locate_dupes_and_show_progress(checksum_result, sort_key=None):
 
 
 def _search_stdin_and_stream_results(
-    csv_labels, unread_files_log_path, show_progress=False
+    unread_files_log_path,
+    show_progress=False,
+    format="csv",
 ):
     """Search paths from stdin for dupes and stream results to stdout.
 
     Args:
-        csv_labels: A iterable of strings or numbers which are written
-            once as the first row of the file. To omit the label row
-            pass []. To print a blank row pass ['', ''].
         unread_files_log_path: A path-like object giving the location
             to log suppressed read-errors to.
         show_progress: A bool indicating whether to display the progress
             of checksumming and comparison processes. Defaults to False.
+        format: A string specifying the format to be written.
+            Passed to Dupes.write_any_items_to(). Defaults to 'csv'.
 
     Returns:
         A list of return codes produced by the search_for_dupes calls.
@@ -489,6 +538,7 @@ def _search_stdin_and_stream_results(
 
     if show_progress:
         print("Processing input stream...", file=sys.stderr)
+    kwargs_for_writer = {"format": format, "closefd": False}
     return_codes = []
     for index, line in enumerate(sys.stdin):
         path = pathlib.Path(line.rstrip()).expanduser()
@@ -497,11 +547,11 @@ def _search_stdin_and_stream_results(
             return_codes.append(1)
             continue
         search_result = search_for_dupes(path, show_progress=show_progress)
-        csv_labels_arg = [] if index > 0 else csv_labels
+        # Make the CSV's label row only print once.
+        if index == 1 and format == "csv":
+            kwargs_for_writer["labels"] = []
         # The fd is kept open so writes append.
-        search_result.dupes.write_any_items_to(
-            sys.stdout.fileno(), csv_labels_arg, closefd=False
-        )
+        search_result.dupes.write_any_items_to(sys.stdout.fileno(), **kwargs_for_writer)
         os_errors = search_result.dupes.checksum_result.os_errors
         _write_any_errors_to(unread_files_log_path, os_errors, mode="a")
         return_codes.append(search_result.return_code)
@@ -578,6 +628,12 @@ def _get_listdupes_args(overriding_args=None):
             " list duplicates contained within each starting folder,"
             " not across multiple starting folders."
         ),
+    )
+    parser.add_argument(
+        "-j",
+        "--json",
+        action="store_true",
+        help="Write the output as a JSON file instead of a CSV. ",
     )
     parser.add_argument(
         "-p",
@@ -659,14 +715,17 @@ def main(overriding_args=None):
         "main_return_tuple", ["final_message", "return_code"]
     )
     args = _get_listdupes_args(overriding_args)  # This can exit with 2.
+    if args.json:
+        output_ext = format_arg = "json"
+    else:
+        output_ext = format_arg = "csv"
     traditional_unix_stdin_arg = pathlib.Path("-")
-    csv_column_labels = ["File", "Duplicates"]
 
     # Determine the eventual paths of all necessary files.
     # NOTE: This is done as early as possible to allow for
     # an early exit if we can't write to a drive.
     files_to_make = [
-        ("listdupes_output.csv", "output file"),
+        (f"listdupes_output.{output_ext}", "output file"),
         ("listdupes_unread_files_log.txt", "error log"),
     ]
     try:
@@ -677,7 +736,7 @@ def main(overriding_args=None):
 
     if args.filter or args.starting_folder == traditional_unix_stdin_arg:
         return_codes_from_search = _search_stdin_and_stream_results(
-            csv_column_labels, unread_files_log_path, show_progress=args.progress
+            unread_files_log_path, show_progress=args.progress, format=format_arg
         )
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
@@ -699,12 +758,12 @@ def main(overriding_args=None):
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        search_result.dupes.write_any_items_to(output_path, csv_column_labels)
+        search_result.dupes.write_any_items_to(output_path, format=format_arg)
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
         _handle_exception_at_write_time(sys.exc_info())
-        search_result.dupes.write_any_items_to(sys.stdout.fileno(), csv_column_labels)
+        search_result.dupes.write_any_items_to(sys.stdout.fileno(), format=format_arg)
         return result_tuple("", 1)
 
     save_description = f"The list of duplicates has been saved to {output_path.parent}."
