@@ -223,54 +223,40 @@ class Dupes(collections.defaultdict):
         sum_of_lengths = sum([len(mapped_value) for mapped_value in self.values()])
         return sum_of_lengths
 
-    def write_any_items_to(
-        self, file, format="csv", encoding="utf-8", errors="replace", mode="x", **kwargs
-    ):
+    def write_any_items_to(self, file, format="csv", **kwargs):
         """Write the contents of the mapping to a file.
 
-        The write is skipped if the mapping contains no duplicate files.
-
         Args:
-            output_file: A path-like object or integer file descriptor.
+            file: A path-like object or integer file descriptor.
             format: A string specifying the format to be written.
                 Defaults to 'csv'.
-            encoding: Passed to the writer. Defaults to 'utf-8'.
-            errors: Passed to the writer. Defaults to 'replace'.
-            mode: Passed to the writer. Defaults to 'x'.
-            **kwargs: Passed to open().
+            **kwargs: Passed to the writer function.
         """
 
+        kwargs_for_writer = {}
+        kwargs_for_writer.update(**kwargs)
         if not any(self.values()):
             return None
         writer = {"csv": self.write_to_csv, "json": self.write_to_json}
-        writer[format](file, encoding=encoding, mode=mode, errors=errors, **kwargs)
+        writer[format](file, **kwargs_for_writer)
 
-    def write_to_csv(
-        self,
-        file,
-        labels=["File", "Duplicates"],
-        encoding="utf-8",
-        errors="replace",
-        mode="x",
-        **kwargs,
-    ):
+    def write_to_csv(self, file, labels=["File", "Duplicates"], **kwargs):
         """Write the contents of the mapping as an Excel-style CSV.
 
+        The file opens in: mode='x', encoding='utf-8', errors='replace'.
+
         Args:
-            output_file: A path-like object or integer file descriptor.
+            file: A path-like object or integer file descriptor.
             labels: A iterable of strings or numbers which are written
                 once as the first row of the file. To omit the label row
                 pass []. To print a blank row pass ['', '']. The default
                 is ['File', 'Duplicates']
-            encoding: Passed to open(). Defaults to 'utf-8'.
-            errors: Passed to open(). Defaults to 'replace'.
-            mode: Passed to open(). Defaults to 'x'.
             **kwargs: Passed to open().
         """
 
-        with open(
-            file, encoding=encoding, mode=mode, errors=errors, **kwargs
-        ) as csv_file:
+        kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
+        kwargs_for_open.update(**kwargs)  # Allows override of defaults.
+        with open(file, **kwargs_for_open) as csv_file:
             writer = csv.writer(csv_file)
             if labels:
                 writer.writerow(labels)
@@ -281,23 +267,20 @@ class Dupes(collections.defaultdict):
                     for duplicate in duplicates_list[1:]:
                         writer.writerow(["", duplicate])
 
-    def write_to_json(
-        self, file, encoding="utf-8", errors="replace", mode="x", **kwargs
-    ):
+    def write_to_json(self, file, **kwargs):
         """Write the contents of the mapping as a JSON.
 
+        The file opens in: mode='x', encoding='utf-8', errors='replace'.
+
         Args:
-            output_file: A path-like object or integer file descriptor.
-            encoding: Passed to open(). Defaults to 'utf-8'.
-            errors: Passed to open(). Defaults to 'replace'.
-            mode: Passed to open(). Defaults to 'x'.
+            file: A path-like object or integer file descriptor.
             **kwargs: Passed to open().
         """
 
+        kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
+        kwargs_for_open.update(**kwargs)  # Allows override of defaults.
         json_safe_dict = {str(k): [str(path) for path in v] for k, v in self.items()}
-        with open(
-            file, encoding=encoding, mode=mode, errors=errors, **kwargs
-        ) as json_file:
+        with open(file, **kwargs_for_open) as json_file:
             json.dump(json_safe_dict, json_file)
 
 
@@ -536,9 +519,9 @@ def _search_stdin_and_stream_results(
         A list of return codes produced by the search_for_dupes calls.
     """
 
+    kwargs_for_writer = {"format": format, "closefd": False}
     if show_progress:
         print("Processing input stream...", file=sys.stderr)
-    kwargs_for_writer = {"format": format, "closefd": False}
     return_codes = []
     for index, line in enumerate(sys.stdin):
         path = pathlib.Path(line.rstrip()).expanduser()
@@ -558,13 +541,13 @@ def _search_stdin_and_stream_results(
     return return_codes
 
 
-def _write_any_errors_to(
-    file_path, error_mapping, encoding="utf-8", errors="replace", mode="x", **kwargs
-):
+def _write_any_errors_to(file_path, error_mapping, **kwargs):
     """If a mapping of errors has any values log them in a text file."""
+    kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
+    kwargs_for_open.update(**kwargs)
     if not any(error_mapping.values()):
         return None
-    with open(file_path, mode=mode, encoding=encoding, errors=errors, **kwargs) as file:
+    with open(file_path, **kwargs_for_open) as file:
         for value in error_mapping.values():
             for path, error in value:
                 file.write(f"'{path}' raised '{error}' and was not read.\n")
