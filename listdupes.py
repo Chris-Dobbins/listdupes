@@ -342,12 +342,16 @@ def _make_unique_paths(files_to_make, destination=("~", "home folder")):
         FileExistsError after 255 attempts to determine a unique path.
 
     Returns:
-        A list of unique paths.
+        A named tuple of unique paths. Its fields are named after each
+        path's description (E.g. 'log file' is accessed via .log_file).
     """
 
+    names_for_tuple = []
     root_path, location = destination
     unique_paths = []
     for file_name, description in files_to_make:
+        description_as_field_name = "_".join(description.split())
+        names_for_tuple.append(description_as_field_name)
         path = pathlib.Path(root_path, file_name).expanduser()
         try:
             unique_path = _make_file_path_unique(path)
@@ -357,7 +361,11 @@ def _make_unique_paths(files_to_make, destination=("~", "home folder")):
             )
             raise FileExistsError(message)
         unique_paths.append(unique_path)
-    return unique_paths
+
+    result_tuple = collections.namedtuple(
+        "make_unique_paths_return_tuple", names_for_tuple
+    )
+    return result_tuple(*unique_paths)
 
 
 def _checksum_file_and_store_outcome(file_path, results_container, errors_container):
@@ -709,17 +717,18 @@ def main(overriding_args=None):
     # an early exit if we can't write to a drive.
     files_to_make = [
         (f"listdupes_output.{output_ext}", "output file"),
-        ("listdupes_unread_files_log.txt", "error log"),
+        ("listdupes_unread_files_log.txt", "unread files log"),
     ]
     try:
-        output_path, unread_files_log_path = _make_unique_paths(files_to_make)
+        unique_path = _make_unique_paths(files_to_make)
     except FileExistsError as e:
         message = e.args[0]
         return result_tuple(message, 1)
 
+    # Run as a Unix-style filter if an appropriate arg has been passed.
     if args.filter or args.starting_folder == traditional_unix_stdin_arg:
         return_codes_from_search = _search_stdin_and_stream_results(
-            unread_files_log_path, show_progress=args.progress, format=format_arg
+            unique_path.unread_files_log, show_progress=args.progress, format=format_arg
         )
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
@@ -735,13 +744,15 @@ def main(overriding_args=None):
 
     # Write an unread files log if needed.
     try:
-        _write_any_errors_to(unread_files_log_path, os_errors)
+        _write_any_errors_to(unique_path.unread_files_log, os_errors)
     except Exception:
         print("A log of the unread files couldn't be written.", file=sys.stderr)
 
     # Format the duplicate paths as a CSV and write it to a file.
     try:
-        search_result.dupes.write_any_items_to(output_path, format=format_arg)
+        search_result.dupes.write_any_items_to(
+            unique_path.output_file, format=format_arg
+        )
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
@@ -749,7 +760,9 @@ def main(overriding_args=None):
         search_result.dupes.write_any_items_to(sys.stdout.fileno(), format=format_arg)
         return result_tuple("", 1)
 
-    save_description = f"The list of duplicates has been saved to {output_path.parent}."
+    save_description = (
+        f"The list of duplicates has been saved to {unique_path.output_file.parent}."
+    )
     message = "" if not search_result.dupes else save_description
     return result_tuple(message, search_result.return_code)
 
