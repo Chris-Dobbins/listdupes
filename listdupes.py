@@ -562,12 +562,12 @@ def _write_any_errors_to(file_path, error_mapping, **kwargs):
     return None
 
 
-def _handle_exception_at_write_time(exception_info):
+def _handle_exception_at_write_time(exception_info, file_ext):
     """Print a message and the exception's traceback without exiting."""
     error_message = (
         "An error prevented the app from saving its results.\n"
         "To recover the results copy the text below into an empty\n"
-        "text file and give it a name that ends with .csv"
+        f"text file and give it a name that ends with .{file_ext}"
     )
     escape_codes = ("\x1b[35m", "\x1b[0m") if sys.stderr.isatty() else ("", "")
     style_magenta, reset_style = escape_codes
@@ -756,7 +756,7 @@ def main(overriding_args=None):
     except Exception:
         # Print data to stdout if a file can't be written. If stdout
         # isn't writeable the shell will provide its own error message.
-        _handle_exception_at_write_time(sys.exc_info())
+        _handle_exception_at_write_time(sys.exc_info(), format_arg)
         search_result.dupes.write_any_items_to(sys.stdout.fileno(), format=format_arg)
         return result_tuple("", 1)
 
