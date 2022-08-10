@@ -624,7 +624,7 @@ def _get_listdupes_args(overriding_args=None):
         "-j",
         "--json",
         action="store_true",
-        help="Write the output as a JSON file instead of a CSV. ",
+        help="Write the output as a JSON file instead of a CSV.",
     )
     parser.add_argument(
         "-p",
