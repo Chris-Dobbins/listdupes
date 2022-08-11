@@ -25,6 +25,7 @@ __license__ = "BSD-2-Clause"
 import argparse
 import collections
 import csv
+import datetime
 import json
 import pathlib
 import sys
@@ -368,6 +369,26 @@ def _make_unique_paths(files_to_make, destination=("~", "home folder")):
     return result_tuple(*unique_paths)
 
 
+def _find_sub_paths(starting_folder, return_set=False):
+    """Search sub-folders and return paths not starting with a dot."""
+    sub_paths = starting_folder.glob("**/[!.]*")
+    if not return_set:
+        return sub_paths
+    else:
+        sub_paths = set(sub_paths)
+
+
+def _write_subpaths_to_archive(sub_paths, file_path, **kwargs):
+    """Dump the subpaths to an archive file."""
+    kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
+    kwargs_for_open.update(**kwargs)  # Allows override of defaults.
+    json_safe_subpaths = [str(path) for path in sub_paths]
+    current_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    archive = {"created": current_time, "sub_paths": json_safe_subpaths}
+    with open(file_path, **kwargs_for_open) as json_file:
+        json.dump(archive, json_file)
+
+
 def _checksum_file_and_store_outcome(file_path, results_container, errors_container):
     """Checksum a file, storing the result or error via side-effect.
 
@@ -632,6 +653,12 @@ def _get_listdupes_args(overriding_args=None):
         action="store_true",
         help="Print a progress counter to stderr. This may slow things down.",
     )
+    parser.add_argument(
+        "-s",
+        "--store_files",
+        action="store_true",
+        help="Write the paths found in the starting folder to a file and quit.",
+    )
     args = parser.parse_args(args=overriding_args)
     return args
 
@@ -667,12 +694,11 @@ def search_for_dupes(starting_folder, show_progress=False):
     starting_folder = unexpanded_starting_folder.expanduser()
     if show_progress:
         print("Gathering files...", file=sys.stderr)
-        sub_paths = starting_folder.glob("**/[!.]*")
-        set_of_sub_paths = set(sub_paths)
-        checksum_result = checksum_files_and_show_progress(set_of_sub_paths)
+        sub_paths = _find_sub_paths(starting_folder, return_set=True)
+        checksum_result = checksum_files_and_show_progress(sub_paths)
         dupes = locate_dupes_and_show_progress(checksum_result)
     else:
-        sub_paths = starting_folder.glob("**/[!.]*")
+        sub_paths = _find_sub_paths(starting_folder)
         checksum_result = checksum_files(sub_paths)
         dupes = locate_dupes(checksum_result)
 
@@ -718,12 +744,20 @@ def main(overriding_args=None):
     files_to_make = [
         (f"listdupes_output.{output_ext}", "output file"),
         ("listdupes_unread_files_log.txt", "unread files log"),
+        ("listdupes_folder_archive.json", "folder archive"),
     ]
     try:
         unique_path = _make_unique_paths(files_to_make)
     except FileExistsError as e:
         message = e.args[0]
         return result_tuple(message, 1)
+
+    # Store subpaths as an archive and exit if -s has been passed.
+    if args.store_files:
+        sub_paths = _find_sub_paths(args.starting_folder)
+        sorted_sub_paths = sorted(sub_paths)
+        _write_subpaths_to_archive(sorted_sub_paths, unique_path.folder_archive)
+        return result_tuple("The folder has been archived.", 0)
 
     # Run as a Unix-style filter if an appropriate arg has been passed.
     if args.filter or args.starting_folder == traditional_unix_stdin_arg:
