@@ -371,8 +371,10 @@ def _make_unique_paths(files_to_make, destination=("~", "home folder")):
     return result_tuple(*unique_paths)
 
 
-def _find_sub_paths(starting_folder, return_set=False):
+def _find_sub_paths(starting_folder, return_set=False, show_work_message=False):
     """Search sub-folders and return paths not starting with a dot."""
+    if show_work_message:
+        print("Gathering files...", file=sys.stderr)
     sub_paths = starting_folder.glob("**/[!.]*")
     if not return_set:
         return sub_paths
@@ -560,7 +562,8 @@ def _search_stdin_and_stream_results(
         if problem_with_starting_path:
             return_codes.append(1)
             continue
-        search_result = search_for_dupes(path, show_progress=show_progress)
+        sub_paths = _find_sub_paths(path, show_work_message=show_progress)
+        search_result = search_for_dupes(sub_paths, show_progress=show_progress)
         # Make the CSV's label row only print once.
         if index == 1 and format == "csv":
             kwargs_for_writer["labels"] = []
@@ -656,6 +659,12 @@ def _get_listdupes_args(overriding_args=None):
         help="Print a progress counter to stderr. This may slow things down.",
     )
     parser.add_argument(
+        "-r",
+        "--read_archive",
+        action="store_true",
+        help="Read paths from an archive file instead of from a starting folder.",
+    )
+    parser.add_argument(
         "-s",
         "--store_files",
         action="store_true",
@@ -665,12 +674,11 @@ def _get_listdupes_args(overriding_args=None):
     return args
 
 
-def search_for_dupes(starting_folder, show_progress=False):
-    """Search a path and its subfolders for duplicate files.
+def search_for_dupes(collection_of_paths, show_progress=False):
+    """Search a collection of paths for duplicate files.
 
     Args:
-        starting_folder: A path-like object of the path to recursively
-            search for duplicate files.
+        collection_of_paths: A collection of path-like objects.
         show_progress: A bool indicating whether to display the progress
             of checksumming and comparison processes. Defaults to False.
 
@@ -685,23 +693,17 @@ def search_for_dupes(starting_folder, show_progress=False):
         "search_for_dupes_return_tuple", ["dupes", "description", "return_code"]
     )
 
-    # Return early if starting_folder is not provided.
-    if starting_folder is None:
-        return result_tuple({}, "No starting folder was provided.", 1)
+    # Return early if collection_of_paths is not provided.
+    if not collection_of_paths:
+        return result_tuple({}, "No paths were provided.", 1)
 
-    # Gather all files except those starting with "." and checksum them.
-    # Next compare the checksums, then make a mapping of all the paths
-    # to duplicate files and construct a Dupes object with it.
-    unexpanded_starting_folder = pathlib.Path(starting_folder)
-    starting_folder = unexpanded_starting_folder.expanduser()
+    # Checksum the paths, compare the checksums, then make a mapping
+    # of paths to duplicate files and construct a Dupes object with it.
     if show_progress:
-        print("Gathering files...", file=sys.stderr)
-        sub_paths = _find_sub_paths(starting_folder, return_set=True)
-        checksum_result = checksum_files_and_show_progress(sub_paths)
+        checksum_result = checksum_files_and_show_progress(collection_of_paths)
         dupes = locate_dupes_and_show_progress(checksum_result)
     else:
-        sub_paths = _find_sub_paths(starting_folder)
-        checksum_result = checksum_files(sub_paths)
+        checksum_result = checksum_files(collection_of_paths)
         dupes = locate_dupes(checksum_result)
 
     search_status = dupes.status()
@@ -740,6 +742,7 @@ def main(overriding_args=None):
         output_ext = format_arg = "csv"
     traditional_unix_stdin_arg = pathlib.Path("-")
     filter_mode = args.filter or args.starting_folder == traditional_unix_stdin_arg
+    starting_path_required = not filter_mode and not args.read_archive
 
     # Determine the eventual paths of all necessary files.
     # NOTE: This is done as early as possible to allow for
@@ -757,7 +760,7 @@ def main(overriding_args=None):
 
     # Exit early if a starting path is required and the path is invalid.
     problem_with_starting_path = _starting_path_is_invalid(args.starting_folder)
-    if problem_with_starting_path and not filter_mode:
+    if problem_with_starting_path and starting_path_required:
         return result_tuple(problem_with_starting_path, 1)
 
     # Store subpaths as an archive and exit if -s has been passed.
@@ -774,8 +777,17 @@ def main(overriding_args=None):
         )
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
 
+    if args.read_archive:
+        with open(args.starting_folder) as json_file:
+            archive = json.load(json_file)
+        sub_paths = [pathlib.Path(str_path) for str_path in archive["sub_paths"]]
+    else:
+        sub_paths = _find_sub_paths(
+            args.starting_folder, show_work_message=args.progress
+        )
+
     # Search for dupes and describe the result to the user.
-    search_result = search_for_dupes(args.starting_folder, show_progress=args.progress)
+    search_result = search_for_dupes(sub_paths, show_progress=args.progress)
     os_errors = search_result.dupes.checksum_result.os_errors
     print(search_result.description, file=sys.stderr)
 
