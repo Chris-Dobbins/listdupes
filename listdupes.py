@@ -739,6 +739,7 @@ def main(overriding_args=None):
     else:
         output_ext = format_arg = "csv"
     traditional_unix_stdin_arg = pathlib.Path("-")
+    filter_mode = args.filter or args.starting_folder == traditional_unix_stdin_arg
 
     # Determine the eventual paths of all necessary files.
     # NOTE: This is done as early as possible to allow for
@@ -754,6 +755,11 @@ def main(overriding_args=None):
         message = e.args[0]
         return result_tuple(message, 1)
 
+    # Exit early if a starting path is required and the path is invalid.
+    problem_with_starting_path = _starting_path_is_invalid(args.starting_folder)
+    if problem_with_starting_path and not filter_mode:
+        return result_tuple(problem_with_starting_path, 1)
+
     # Store subpaths as an archive and exit if -s has been passed.
     if args.store_files:
         sub_paths = _find_sub_paths(args.starting_folder)
@@ -762,16 +768,11 @@ def main(overriding_args=None):
         return result_tuple("The folder has been archived.", 0)
 
     # Run as a Unix-style filter if an appropriate arg has been passed.
-    if args.filter or args.starting_folder == traditional_unix_stdin_arg:
+    if filter_mode:
         return_codes_from_search = _search_stdin_and_stream_results(
             unique_path.unread_files_log, show_progress=args.progress, format=format_arg
         )
         return result_tuple("", 3 if any(return_codes_from_search) else 0)
-
-    # Exit early if the path to the starting folder's invalid.
-    problem_with_starting_path = _starting_path_is_invalid(args.starting_folder)
-    if problem_with_starting_path:
-        return result_tuple(problem_with_starting_path, 1)
 
     # Search for dupes and describe the result to the user.
     search_result = search_for_dupes(args.starting_folder, show_progress=args.progress)
