@@ -411,7 +411,7 @@ def _cache_to(file, paths_and_sums, os_errors, place, **kwargs):
         return None
     paths_and_sums = [(str(path), checksum) for path, checksum in paths_and_sums]
     os_errors = {k: list(v) for k, v in os_errors.items()}
-    cache = {"paths_and_sums": paths_and_sums, "os_errors": os_errors, "place": place}
+    cache = {"place": place, "os_errors": os_errors, "paths_and_sums": paths_and_sums}
     with open(file, **kwargs_for_open) as cache_file:
         json.dump(cache, cache_file)
 
@@ -427,7 +427,7 @@ def _read_cache(file):
     ]
     os_errors = {k: set(v) for k, v in listed_os_errors.items()}
     place = cache["place"]
-    return {"paths_and_sums": paths_and_sums, "os_errors": os_errors, "place": place}
+    return {"place": place, "os_errors": os_errors, "paths_and_sums": paths_and_sums}
 
 
 def get_checksum_input_values(
