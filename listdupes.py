@@ -858,11 +858,6 @@ def search_for_dupes(checksum_input, show_progress=False, cache_path=None):
     result_tuple = collections.namedtuple(
         "search_for_dupes_return_tuple", ["dupes", "description", "return_code"]
     )
-
-    # Return early if collection_of_paths is not provided.
-    if not checksum_input.paths:
-        return result_tuple({}, "No paths were provided.", 1)
-
     # Checksum the paths, compare the checksums, then make a mapping
     # of paths to duplicate files and construct a Dupes object with it.
     if show_progress:
