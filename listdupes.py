@@ -394,7 +394,7 @@ def _write_subpaths_to_archive(sub_paths, file_path, **kwargs):
         json.dump(archive, json_file)
 
 
-def _cache_to(file, paths_and_sums, os_errors, place, **kwargs):
+def _cache_checksums_to(file, paths_and_sums, os_errors, place, **kwargs):
     """Write the state of checksum_files function to a file.
 
     Args:
@@ -565,7 +565,7 @@ def checksum_files(
     finally:
         if cache_path:
             total_place = place_state + place
-            _cache_to(cache_path, paths_and_sums, os_errors, total_place)
+            _cache_checksums_to(cache_path, paths_and_sums, os_errors, total_place)
     paths_and_sums.sort(key=sort_key)
     os_errors = {k: sorted(v, key=sort_key) for k, v in os_errors.items()}
     return result_tuple(paths_and_sums, os_errors)
@@ -596,7 +596,7 @@ def checksum_files_and_show_progress(
     finally:
         if cache_path:
             total_place = place_state + place
-            _cache_to(cache_path, paths_and_sums, os_errors, total_place)
+            _cache_checksums_to(cache_path, paths_and_sums, os_errors, total_place)
         checksum_progress.end_count()
     paths_and_sums.sort(key=sort_key)
     os_errors = {k: sorted(v, key=sort_key) for k, v in os_errors.items()}
