@@ -799,6 +799,12 @@ def _get_listdupes_args(overriding_args=None):
         help="Accepts a single path from the terminal.",
     )
     parser.add_argument(
+        "-a",
+        "--archive_folder",
+        action="store_true",
+        help="Write the paths found in the starting folder to a file and quit.",
+    )
+    parser.add_argument(
         "-f",
         "--filter",
         action="store_true",
@@ -826,12 +832,6 @@ def _get_listdupes_args(overriding_args=None):
         "--read_archive",
         action="store_true",
         help="Read paths from an archive file instead of from a starting folder.",
-    )
-    parser.add_argument(
-        "-a",
-        "--archive_folder",
-        action="store_true",
-        help="Write the paths found in the starting folder to a file and quit.",
     )
     args = parser.parse_args(args=overriding_args)
     return args
