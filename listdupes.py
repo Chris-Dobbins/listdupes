@@ -380,7 +380,7 @@ def _find_sub_paths(starting_folder, return_set=False, show_work_message=False):
     if not return_set:
         return sub_paths
     else:
-        sub_paths = set(sub_paths)
+        return set(sub_paths)
 
 
 def _write_subpaths_to_archive(sub_paths, file_path, **kwargs):
