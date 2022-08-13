@@ -988,7 +988,7 @@ def main(overriding_args=None):
         return result_tuple("", 1)
 
     save_description = (
-        f"The list of duplicates has been saved to {unique_path.output_file.parent}."
+        f"The list of duplicates has been saved to {unique_path.output_file}."
     )
     message = "" if not search_result.dupes else save_description
     return result_tuple(message, search_result.return_code)
