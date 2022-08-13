@@ -959,7 +959,11 @@ def main(overriding_args=None):
 
 # Run the app!
 if __name__ == "__main__":
-    main_result = main()
+    try:
+        main_result = main()
+    except KeyboardInterrupt:
+        print("You have quit the program.", file=sys.stderr)
+        sys.exit(130)
     if main_result.final_message:
         print(main_result.final_message, file=sys.stderr)
     sys.exit(main_result.return_code)
