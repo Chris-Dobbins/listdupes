@@ -287,24 +287,77 @@ class Dupes(collections.defaultdict):
 
 
 # Functions
-def _starting_path_is_invalid(path):
-    """Determine if the path is an existing folder.
+def _get_listdupes_args(overriding_args=None):
+    """Parse arguments with the argparse module and return the result.
 
     Args:
-        path: An instance of pathlib.Path or its subclasses.
+        overriding_args: Accepts a list of strings to parse.
+            This is passed to the parser's parse_args() method.
+            When the value is None (As it is by default) parse_args()
+            taking its arguments from sys.argv.
 
     Returns:
-        A string describing why the path is invalid, or an empty string.
+        An argparse.Namespace object containing the app's arguments.
+        The object uses the arguments's long names as attributes,
+        with each attribute holding the result of parsing that argument.
+        E.g. args.progress holds the value of the --progress argument.
     """
 
-    if not path:
-        return "A starting folder is required."
-    if not path.exists():
-        return "No such file exist at that location."
-    elif not path.is_dir():
-        return "The starting path must be a folder."
-    else:
-        return ""
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
+    )
+    # Replace the default -h with a reformatted help description.
+    parser.add_argument(
+        "-h",
+        "--help",
+        action="help",
+        help="Show this help message and exit.",
+    )
+    parser.add_argument(
+        "starting_folder",
+        type=pathlib.Path,
+        nargs="?",
+        help="Accepts a single path from the terminal.",
+    )
+    parser.add_argument(
+        "-a",
+        "--archive_folder",
+        action="store_true",
+        help="Write the paths found in the starting folder to a file and quit.",
+    )
+    parser.add_argument(
+        "-f",
+        "--filter",
+        action="store_true",
+        help=(
+            "Accept starting folder paths from stdin and output results to stdout."
+            "  Note that this may not be what you want, as it will"
+            " list duplicates contained within each starting folder,"
+            " not across multiple starting folders."
+        ),
+    )
+    parser.add_argument(
+        "-j",
+        "--json",
+        action="store_true",
+        help="Write the output as a JSON file instead of a CSV.",
+    )
+    parser.add_argument(
+        "-p",
+        "--progress",
+        action="store_true",
+        help="Print a progress counter to stderr. This may slow things down.",
+    )
+    parser.add_argument(
+        "-r",
+        "--read_archive",
+        action="store_true",
+        help="Read paths from an archive file instead of from a starting folder.",
+    )
+    args = parser.parse_args(args=overriding_args)
+    return args
 
 
 def _make_file_path_unique(path):
@@ -370,6 +423,26 @@ def _make_unique_paths(files_to_make, destination=("~", "home folder")):
         "make_unique_paths_return_tuple", names_for_tuple
     )
     return result_tuple(*unique_paths)
+
+
+def _starting_path_is_invalid(path):
+    """Determine if the path is an existing folder.
+
+    Args:
+        path: An instance of pathlib.Path or its subclasses.
+
+    Returns:
+        A string describing why the path is invalid, or an empty string.
+    """
+
+    if not path:
+        return "A starting folder is required."
+    if not path.exists():
+        return "No such file exist at that location."
+    elif not path.is_dir():
+        return "The starting path must be a folder."
+    else:
+        return ""
 
 
 def _find_sub_paths(starting_folder, return_set=False, show_work_message=False):
@@ -694,149 +767,6 @@ def locate_dupes_and_show_progress(checksum_result, sort_key=None):
     return dupes
 
 
-def _search_stdin_and_stream_results(
-    unread_files_log_path,
-    show_progress=False,
-    format="csv",
-):
-    """Search paths from stdin for dupes and stream results to stdout.
-
-    Args:
-        unread_files_log_path: A path-like object giving the location
-            to log suppressed read-errors to.
-        show_progress: A bool indicating whether to display the progress
-            of checksumming and comparison processes. Defaults to False.
-        format: A string specifying the format to be written.
-            Passed to Dupes.write_any_items_to(). Defaults to 'csv'.
-
-    Returns:
-        A list of return codes produced by the search_for_dupes calls.
-    """
-
-    kwargs_for_writer = {"format": format, "closefd": False}
-    if show_progress:
-        print("Processing input stream...", file=sys.stderr)
-    return_codes = []
-    for index, line in enumerate(sys.stdin):
-        path = pathlib.Path(line.rstrip()).expanduser()
-        problem_with_starting_path = _starting_path_is_invalid(path)
-        if problem_with_starting_path:
-            return_codes.append(1)
-            continue
-        sub_paths = _find_sub_paths(
-            path, show_work_message=show_progress, return_set=show_progress
-        )
-        search_result = search_for_dupes(sub_paths, show_progress=show_progress)
-        # Make the CSV's label row only print once.
-        if index == 1 and format == "csv":
-            kwargs_for_writer["labels"] = []
-        # The fd is kept open so writes append.
-        search_result.dupes.write_any_items_to(sys.stdout.fileno(), **kwargs_for_writer)
-        os_errors = search_result.dupes.checksum_result.os_errors
-        _write_any_errors_to(unread_files_log_path, os_errors, mode="a")
-        return_codes.append(search_result.return_code)
-    return return_codes
-
-
-def _write_any_errors_to(file_path, error_mapping, **kwargs):
-    """If a mapping of errors has any values log them in a text file."""
-    kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
-    kwargs_for_open.update(**kwargs)
-    if not any(error_mapping.values()):
-        return None
-    with open(file_path, **kwargs_for_open) as file:
-        for value in error_mapping.values():
-            for path, error in value:
-                file.write(f"'{path}' raised '{error}' and was not read.\n")
-    return None
-
-
-def _handle_exception_at_write_time(exception_info, file_ext):
-    """Print a message and the exception's traceback without exiting."""
-    error_message = (
-        "An error prevented the app from saving its results.\n"
-        "To recover the results copy the text below into an empty\n"
-        f"text file and give it a name that ends with .{file_ext}"
-    )
-    escape_codes = ("\x1b[35m", "\x1b[0m") if sys.stderr.isatty() else ("", "")
-    style_magenta, reset_style = escape_codes
-    sys.excepthook(*exception_info)  # Prints traceback to stderr.
-    print(style_magenta, error_message, reset_style, sep="", file=sys.stderr)
-
-
-def _get_listdupes_args(overriding_args=None):
-    """Parse arguments with the argparse module and return the result.
-
-    Args:
-        overriding_args: Accepts a list of strings to parse.
-            This is passed to the parser's parse_args() method.
-            When the value is None (As it is by default) parse_args()
-            taking its arguments from sys.argv.
-
-    Returns:
-        An argparse.Namespace object containing the app's arguments.
-        The object uses the arguments's long names as attributes,
-        with each attribute holding the result of parsing that argument.
-        E.g. args.progress holds the value of the --progress argument.
-    """
-
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        add_help=False,
-    )
-    # Replace the default -h with a reformatted help description.
-    parser.add_argument(
-        "-h",
-        "--help",
-        action="help",
-        help="Show this help message and exit.",
-    )
-    parser.add_argument(
-        "starting_folder",
-        type=pathlib.Path,
-        nargs="?",
-        help="Accepts a single path from the terminal.",
-    )
-    parser.add_argument(
-        "-a",
-        "--archive_folder",
-        action="store_true",
-        help="Write the paths found in the starting folder to a file and quit.",
-    )
-    parser.add_argument(
-        "-f",
-        "--filter",
-        action="store_true",
-        help=(
-            "Accept starting folder paths from stdin and output results to stdout."
-            "  Note that this may not be what you want, as it will"
-            " list duplicates contained within each starting folder,"
-            " not across multiple starting folders."
-        ),
-    )
-    parser.add_argument(
-        "-j",
-        "--json",
-        action="store_true",
-        help="Write the output as a JSON file instead of a CSV.",
-    )
-    parser.add_argument(
-        "-p",
-        "--progress",
-        action="store_true",
-        help="Print a progress counter to stderr. This may slow things down.",
-    )
-    parser.add_argument(
-        "-r",
-        "--read_archive",
-        action="store_true",
-        help="Read paths from an archive file instead of from a starting folder.",
-    )
-    args = parser.parse_args(args=overriding_args)
-    return args
-
-
 def search_for_dupes(checksum_input, show_progress=False, cache_path=None):
     """Search a collection of paths for duplicate files.
 
@@ -881,6 +811,76 @@ def search_for_dupes(checksum_input, show_progress=False, cache_path=None):
 
     search_status = dupes.status()
     return result_tuple(dupes, search_status.description, search_status.return_code)
+
+
+def _write_any_errors_to(file_path, error_mapping, **kwargs):
+    """If a mapping of errors has any values log them in a text file."""
+    kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
+    kwargs_for_open.update(**kwargs)
+    if not any(error_mapping.values()):
+        return None
+    with open(file_path, **kwargs_for_open) as file:
+        for value in error_mapping.values():
+            for path, error in value:
+                file.write(f"'{path}' raised '{error}' and was not read.\n")
+    return None
+
+
+def _search_stdin_and_stream_results(
+    unread_files_log_path,
+    show_progress=False,
+    format="csv",
+):
+    """Search paths from stdin for dupes and stream results to stdout.
+
+    Args:
+        unread_files_log_path: A path-like object giving the location
+            to log suppressed read-errors to.
+        show_progress: A bool indicating whether to display the progress
+            of checksumming and comparison processes. Defaults to False.
+        format: A string specifying the format to be written.
+            Passed to Dupes.write_any_items_to(). Defaults to 'csv'.
+
+    Returns:
+        A list of return codes produced by the search_for_dupes calls.
+    """
+
+    kwargs_for_writer = {"format": format, "closefd": False}
+    if show_progress:
+        print("Processing input stream...", file=sys.stderr)
+    return_codes = []
+    for index, line in enumerate(sys.stdin):
+        path = pathlib.Path(line.rstrip()).expanduser()
+        problem_with_starting_path = _starting_path_is_invalid(path)
+        if problem_with_starting_path:
+            return_codes.append(1)
+            continue
+        sub_paths = _find_sub_paths(
+            path, show_work_message=show_progress, return_set=show_progress
+        )
+        search_result = search_for_dupes(sub_paths, show_progress=show_progress)
+        # Make the CSV's label row only print once.
+        if index == 1 and format == "csv":
+            kwargs_for_writer["labels"] = []
+        # The fd is kept open so writes append.
+        search_result.dupes.write_any_items_to(sys.stdout.fileno(), **kwargs_for_writer)
+        os_errors = search_result.dupes.checksum_result.os_errors
+        _write_any_errors_to(unread_files_log_path, os_errors, mode="a")
+        return_codes.append(search_result.return_code)
+    return return_codes
+
+
+def _handle_exception_at_write_time(exception_info, file_ext):
+    """Print a message and the exception's traceback without exiting."""
+    error_message = (
+        "An error prevented the app from saving its results.\n"
+        "To recover the results copy the text below into an empty\n"
+        f"text file and give it a name that ends with .{file_ext}"
+    )
+    escape_codes = ("\x1b[35m", "\x1b[0m") if sys.stderr.isatty() else ("", "")
+    style_magenta, reset_style = escape_codes
+    sys.excepthook(*exception_info)  # Prints traceback to stderr.
+    print(style_magenta, error_message, reset_style, sep="", file=sys.stderr)
 
 
 def main(overriding_args=None):
