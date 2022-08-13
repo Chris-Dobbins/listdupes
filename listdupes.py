@@ -607,8 +607,8 @@ def locate_dupes(checksum_result, sort_key=None):
     """Locate duplicate files by comparing their checksums.
 
     Args:
-        checksum_result: A list of tuples, each containing a path-like
-            object and the checksum of the associated file.
+        checksum_result: A named tuple as per the result of one of the
+            two checksum function.
         sort_key: A function for sorting the return value's
             collections. The default of None dictates an ascending sort.
 
