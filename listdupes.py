@@ -525,7 +525,9 @@ def get_checksum_input_values(
         paths = [pathlib.Path(str_path) for str_path in archive["sub_paths"]]
         return result_tuple(paths, [], os_errors, 0)
     else:
-        paths = _find_sub_paths(starting_path, show_work_message=show_progress)
+        paths = _find_sub_paths(
+            starting_path, show_work_message=show_progress, return_set=show_progress
+        )
         return result_tuple(paths, [], os_errors, 0)
 
 
@@ -721,7 +723,9 @@ def _search_stdin_and_stream_results(
         if problem_with_starting_path:
             return_codes.append(1)
             continue
-        sub_paths = _find_sub_paths(path, show_work_message=show_progress)
+        sub_paths = _find_sub_paths(
+            path, show_work_message=show_progress, return_set=show_progress
+        )
         search_result = search_for_dupes(sub_paths, show_progress=show_progress)
         # Make the CSV's label row only print once.
         if index == 1 and format == "csv":
@@ -940,7 +944,9 @@ def main(overriding_args=None):
 
     # Archive subpaths to a file and exit if -a has been passed.
     if args.archive_folder:
-        sub_paths = _find_sub_paths(args.starting_folder)
+        sub_paths = _find_sub_paths(
+            args.starting_folder, show_work_message=args.show_progress
+        )
         sorted_sub_paths = sorted(sub_paths)
         _write_subpaths_to_archive(sorted_sub_paths, unique_path.folder_archive)
         return result_tuple("The folder has been archived.", 0)
