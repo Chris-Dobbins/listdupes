@@ -940,7 +940,7 @@ def main(overriding_args=None):
     # Archive subpaths to a file and exit if -a has been passed.
     if args.archive_folder:
         sub_paths = _find_sub_paths(
-            args.starting_folder, show_work_message=args.show_progress
+            args.starting_folder, show_work_message=args.progress
         )
         sorted_sub_paths = sorted(sub_paths)
         _write_subpaths_to_archive(sorted_sub_paths, unique_path.folder_archive)
