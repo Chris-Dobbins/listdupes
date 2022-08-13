@@ -787,8 +787,8 @@ def _get_listdupes_args(overriding_args=None):
         help="Read paths from an archive file instead of from a starting folder.",
     )
     parser.add_argument(
-        "-s",
-        "--store_files",
+        "-a",
+        "--archive_folder",
         action="store_true",
         help="Write the paths found in the starting folder to a file and quit.",
     )
@@ -901,8 +901,8 @@ def main(overriding_args=None):
     if problem_with_starting_path and starting_path_required:
         return result_tuple(problem_with_starting_path, 1)
 
-    # Store subpaths as an archive and exit if -s has been passed.
-    if args.store_files:
+    # Archive subpaths to a file and exit if -a has been passed.
+    if args.archive_folder:
         sub_paths = _find_sub_paths(args.starting_folder)
         sorted_sub_paths = sorted(sub_paths)
         _write_subpaths_to_archive(sorted_sub_paths, unique_path.folder_archive)
