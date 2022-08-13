@@ -430,6 +430,34 @@ def _read_cache(file):
     return {"place": place, "os_errors": os_errors, "paths_and_sums": paths_and_sums}
 
 
+def _describe_old_archive(creation_timestamp):
+    """If an archive is old return a description of how old it is."""
+    utc = datetime.timezone.utc
+    current_time = datetime.datetime.now(utc)
+    archive_creation_time = datetime.datetime.fromtimestamp(creation_timestamp, tz=utc)
+    time_between_creation_and_now = current_time - archive_creation_time
+    a_year = datetime.timedelta(weeks=52)
+    half_a_year = datetime.timedelta(days=183)
+    roughly_a_month = datetime.timedelta(days=31)
+    a_week = datetime.timedelta(days=7)
+
+    if time_between_creation_and_now > a_year:
+        description = "a year"
+    elif time_between_creation_and_now > half_a_year:
+        description = "half a year"
+    elif time_between_creation_and_now > roughly_a_month:
+        description = "a month"
+    elif time_between_creation_and_now > a_week:
+        description = "a week"
+    else:
+        description = ""
+
+    if description:
+        return f"This archive was made over {description} ago."
+    else:
+        return ""
+
+
 def get_checksum_input_values(
     starting_path, read_from_archive, show_progress, cache_file_path
 ):
@@ -472,9 +500,15 @@ def get_checksum_input_values(
         "file_not_found_errors": set(),
         "misc_errors": set(),
     }
+    escape_codes = ("\x1b[1m", "\x1b[0m") if sys.stderr.isatty() else ("", "")
+    bold, reset_style = escape_codes
+
     if read_from_archive and cache_file_path.exists():
         with open(starting_path) as json_file:
             archive = json.load(json_file)
+        old_archive_description = _describe_old_archive(archive["created"])
+        if old_archive_description:
+            print(bold, old_archive_description, reset_style, sep="", file=sys.stderr)
         all_sub_paths = [pathlib.Path(str_path) for str_path in archive["sub_paths"]]
         cached = _read_cache(cache_file_path)
         place_in_sub_paths = cached["place"]
@@ -485,6 +519,9 @@ def get_checksum_input_values(
     elif read_from_archive:
         with open(starting_path) as json_file:
             archive = json.load(json_file)
+        old_archive_description = _describe_old_archive(archive["created"])
+        if old_archive_description:
+            print(bold, old_archive_description, reset_style, sep="", file=sys.stderr)
         paths = [pathlib.Path(str_path) for str_path in archive["sub_paths"]]
         return result_tuple(paths, [], os_errors, 0)
     else:
