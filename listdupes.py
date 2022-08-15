@@ -16,6 +16,7 @@ __all__ = [
     "locate_dupes_and_show_progress",
     "main",
     "search_for_dupes",
+    "PreviousFileNotFoundError",
 ]
 __version__ = "6.0.0-alpha.3"
 __author__ = "Chris Dobbins"
