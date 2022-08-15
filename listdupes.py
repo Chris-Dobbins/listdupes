@@ -602,18 +602,22 @@ def _describe_old_archive(creation_timestamp):
 
 
 def get_checksum_input_values(
-    starting_path, read_from_archive, show_progress, cache_file_path
+    starting_path,
+    show_progress,
+    read_from_archive=False,
+    cache_file_path=None,
 ):
     """Return the initial values to pass to a checksum function.
 
     Args:
         starting_path: An instance of pathlib.Path or its subclasses.
-        read_from_archive: A bool determining if values should be read
-            from an archive and possibly a cache.
         show_progress: A bool indicating whether the path gathering
             function should print a message when it starts.
+        read_from_archive: A bool determining if values should be read
+            from an archive and possibly a cache. Defaults to False.
         cache_file_path: An instance of pathlib.Path or its subclasses
             representing the location to check for a cache.
+            Defaults to None.
 
     Returns:
         A named tuple ('paths', 'paths_and_sums', 'os_errors', 'place').
@@ -646,7 +650,7 @@ def get_checksum_input_values(
     escape_codes = ("\x1b[1m", "\x1b[0m") if sys.stderr.isatty() else ("", "")
     bold, reset_style = escape_codes
 
-    if read_from_archive and cache_file_path.exists():
+    if read_from_archive and cache_file_path and cache_file_path.exists():
         with open(starting_path) as json_file:
             archive = json.load(json_file)
         old_archive_description = _describe_old_archive(archive["created"])
@@ -925,10 +929,10 @@ def _search_stdin_and_stream_results(
         if problem_with_starting_path:
             return_codes.append(1)
             continue
-        sub_paths = _find_sub_paths(
-            path, show_work_message=show_progress, return_set=show_progress
+        checksum_input_values = get_checksum_input_values(path, show_progress)
+        search_result = search_for_dupes(
+            checksum_input_values, show_progress=show_progress
         )
-        search_result = search_for_dupes(sub_paths, show_progress=show_progress)
         # Make the CSV's label row only print once.
         if index == 1 and format == "csv":
             kwargs_for_writer["labels"] = []
@@ -1017,9 +1021,9 @@ def main(overriding_args=None):
     # Determine input values for the checksum function.
     checksum_input_values = get_checksum_input_values(
         args.starting_folder,
-        args.read_archive,
         args.progress,
-        hardcoded_cache_path,
+        read_from_archive=args.read_archive,
+        cache_file_path=hardcoded_cache_path,
     )
 
     # Search for dupes and describe the result to the user.
