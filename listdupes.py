@@ -286,6 +286,24 @@ class Dupes(collections.defaultdict):
             json.dump(json_safe_dict, json_file)
 
 
+class PreviousFileNotFoundError(Exception):
+    """A previously located file can't be found now."""
+
+    def __init__(self, message, filename, filename2=None):
+        """The values used to initialize a new instance of the error.
+
+        Args:
+            message: A description of the error.
+            filename: The path of the file which raised the exception.
+            filename2: The first parent path of 'filename' which is
+                found to exist, if any. The default is None.
+        """
+
+        self.message = message
+        self.filename = filename
+        self.filename2 = filename2
+
+
 # Functions
 def _get_listdupes_args(overriding_args=None):
     """Parse arguments with the argparse module and return the result.
@@ -678,11 +696,36 @@ def get_checksum_input_values(
         return result_tuple(paths, [], os_errors, 0)
 
 
+def _check_path_for_disconnection(file_path):
+    """Check if any of a path's parent path segments can't be found.
+
+    Args:
+        file_path: An instance of pathlib.Path or its subclasses.
+    Raises:
+        PreviousFileNotFoundError
+    """
+
+    missing_parent_path = None
+    longest_existing_parent = None
+    for parent_path in file_path.parents:
+        if not parent_path.exists() and missing_parent_path is None:
+            missing_parent_path = parent_path
+        elif parent_path.exists() and missing_parent_path:
+            longest_existing_parent = parent_path
+    if missing_parent_path:
+        message = "A previously located file couldn't be located."
+        if longest_existing_parent:
+            message += f" Nothing beyond {longest_existing_parent} could be found."
+        raise PreviousFileNotFoundError(
+            message, missing_parent_path, filename2=longest_existing_parent
+        )
+
+
 def _checksum_file_and_store_outcome(file_path, results_container, errors_container):
     """Checksum a file, storing the result or error via side-effect.
 
     Args:
-        file_path: A path-like object.
+        file_path: An instance of pathlib.Path or its subclasses.
         results_container: A container which is either empty or which
             contains tuples of (path-like object, Int) which pair
             a path with the checksum of the associated file.
@@ -702,6 +745,7 @@ def _checksum_file_and_store_outcome(file_path, results_container, errors_contai
         return
     except FileNotFoundError as e:
         errors_container["file_not_found_errors"].add((e.filename, e.strerror))
+        _check_path_for_disconnection(file_path)
         return
     except OSError as e:
         errors_container["misc_errors"].add((e.filename, e.strerror))
