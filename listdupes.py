@@ -456,13 +456,18 @@ def _find_sub_paths(starting_folder, return_set=False, show_work_message=False):
         return set(sub_paths)
 
 
-def _write_subpaths_to_archive(sub_paths, file_path, **kwargs):
+def _write_subpaths_to_archive(sub_paths, starting_folder, file_path, **kwargs):
     """Dump the subpaths to an archive file."""
     kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
     kwargs_for_open.update(**kwargs)  # Allows override of defaults.
     json_safe_subpaths = [str(path) for path in sub_paths]
     current_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
-    archive = {"created": current_time, "sub_paths": json_safe_subpaths}
+    json_safe_starting_folder = str(starting_folder)
+    archive = {
+        "created": current_time,
+        "starting_folder": json_safe_starting_folder,
+        "sub_paths": json_safe_subpaths,
+    }
     with open(file_path, **kwargs_for_open) as json_file:
         json.dump(archive, json_file)
 
@@ -513,7 +518,9 @@ def _do_pre_checksumming_tasks(
     if write_archive:
         sub_paths = _find_sub_paths(starting_path, show_work_message=show_progress)
         sorted_sub_paths = sorted(sub_paths)
-        _write_subpaths_to_archive(sorted_sub_paths, unique_path.folder_archive)
+        _write_subpaths_to_archive(
+            sorted_sub_paths, starting_path, unique_path.folder_archive
+        )
         message = "The folder has been archived."
         return result_tuple(None, main_return_constructor(message, 0))
 
