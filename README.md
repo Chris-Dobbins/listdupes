@@ -14,9 +14,10 @@ to delete any critical data.
 #### Features
 
 *   Nothing else to install besides Python
+*   Got a huge folder to check? Archive a list of its files and listdupes will automatically save and resume its work when reading from that archive.
+*   Optional progress counter
 *   Helpful error messages for people new to command-line programs
 *   Unix-style behavior for people with experience
-*   Optional progress counter
 *   Filter functionality for advanced use cases
 
 #### Examples of Use
@@ -26,6 +27,12 @@ Search a folder and its subfolders for duplicates:
 
 Search an external drive and show a progress counter:  
 `/path/to/listdupes.py --progress /Volumes/FlashDrive`
+
+Make an archive file listing a folder's current contents:
+`/path/to/listdupes.py --archive_folder /Users/adira/Photos`
+
+Read from that archive and listdupes will automatically save its progress as it checks those files:
+`/path/to/listdupes.py --read_archive /Users/adira/listdupes_folder_archive.json`
 
 Act as a filter (e.g. grep), processing input from stdin and sending it to stdout:  
 `/path/to/listdupes.py --filter < ~/list_of_network_drives.txt > ~/Desktop/output_file.csv`
