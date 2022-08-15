@@ -446,7 +446,7 @@ def _starting_path_is_invalid(path, read_archive=False):
         return "A starting folder is required."
     elif not path.exists():
         return "No such folder exist at that location."
-    elif not path.is_dir():
+    elif not read_archive and not path.is_dir():
         return "The starting path must be a folder."
     else:
         return ""
