@@ -384,13 +384,13 @@ def _make_file_path_unique(path):
     raise FileExistsError("A unique path name could not be created.")
 
 
-def _make_unique_paths(files_to_make, destination=("~", "home folder")):
+def _make_unique_paths(paths_to_make, destination=("~", "home folder")):
     """Make unique paths and raise a helpful error if one can't be made.
 
     Args:
-        files_to_make: A list of tuples (str, str), each containing
-            the name of a file to be created and a description of
-            its purpose to use in the creation of errors.
+        paths_to_make: A list of tuples (str, str), each containing
+            the name of a file and a description of its purpose
+            to use in the creation of errors.
         destination: A tuple (str, str) containing the root path of the
             paths to be created and a description to use in errors.
             Defaults to the user's home folder.
@@ -406,7 +406,7 @@ def _make_unique_paths(files_to_make, destination=("~", "home folder")):
     names_for_tuple = []
     root_path, location = destination
     unique_paths = []
-    for file_name, description in files_to_make:
+    for file_name, description in paths_to_make:
         description_as_field_name = "_".join(description.split())
         names_for_tuple.append(description_as_field_name)
         path = pathlib.Path(root_path, file_name).expanduser()
@@ -465,6 +465,59 @@ def _write_subpaths_to_archive(sub_paths, file_path, **kwargs):
     archive = {"created": current_time, "sub_paths": json_safe_subpaths}
     with open(file_path, **kwargs_for_open) as json_file:
         json.dump(archive, json_file)
+
+
+def _do_pre_checksumming_tasks(
+    *,
+    paths_to_make,
+    main_return_constructor,
+    starting_path,
+    starting_path_required,
+    write_archive,
+    show_progress,
+):
+    """Give main() the means to either proceed or exit early.
+
+    Since this is a fairly abstract function with many arguments it uses
+    required keyword-only arguments to help prevent errors in usage.
+
+    Args:
+        paths_to_make: A list of tuples, passed to _make_unique_paths().
+        main_return_constructor: Main()'s return value constructor.
+        starting_folder: An instance of pathlib.Path or its subclasses.
+        starting_path_required: A bool.
+        archive: A bool.
+        show_progress: A bool.
+
+    Return:
+        A named tuple ("unique_path", "early_exit") where
+        'unique_path' is the returned value of _make_unique_paths() and
+        'early_exit' is a valid return value for main().
+    """
+
+    result_tuple = collections.namedtuple(
+        "do_pre_checksumming_tasks_return_tuple", ["unique_path", "early_exit"]
+    )
+    # Determine the eventual paths of all necessary files.
+    try:
+        unique_path = _make_unique_paths(paths_to_make)
+    except FileExistsError as e:
+        return result_tuple(None, main_return_constructor(str(e), 1))
+
+    # Exit early if a starting path is required and the path is invalid.
+    issue_with_starting_path = _starting_path_is_invalid(starting_path)
+    if issue_with_starting_path and starting_path_required:
+        return result_tuple(None, main_return_constructor(issue_with_starting_path, 1))
+
+    # Archive subpaths to a file and exit if -a has been passed.
+    if write_archive:
+        sub_paths = _find_sub_paths(starting_path, show_work_message=show_progress)
+        sorted_sub_paths = sorted(sub_paths)
+        _write_subpaths_to_archive(sorted_sub_paths, unique_path.folder_archive)
+        message = "The folder has been archived."
+        return result_tuple(None, main_return_constructor(message, 0))
+
+    return result_tuple(unique_path, None)
 
 
 def _cache_checksums_to(file, paths_and_sums, os_errors, place, **kwargs):
@@ -917,34 +970,24 @@ def main(overriding_args=None):
     filter_mode = args.filter or args.starting_folder == traditional_unix_stdin_arg
     starting_path_required = not filter_mode and not args.read_archive
     hardcoded_cache_path = pathlib.Path("~", "listdupes_cache").expanduser()
-
-    # Determine the eventual paths of all necessary files.
-    # NOTE: This is done as early as possible to allow for
-    # an early exit if we can't write to a drive.
-    files_to_make = [
+    paths_to_make = [
         (f"listdupes_output.{output_ext}", "output file"),
         ("listdupes_unread_files_log.txt", "unread files log"),
         ("listdupes_folder_archive.json", "folder archive"),
     ]
-    try:
-        unique_path = _make_unique_paths(files_to_make)
-    except FileExistsError as e:
-        message = e.args[0]
-        return result_tuple(message, 1)
 
-    # Exit early if a starting path is required and the path is invalid.
-    problem_with_starting_path = _starting_path_is_invalid(args.starting_folder)
-    if problem_with_starting_path and starting_path_required:
-        return result_tuple(problem_with_starting_path, 1)
-
-    # Archive subpaths to a file and exit if -a has been passed.
-    if args.archive_folder:
-        sub_paths = _find_sub_paths(
-            args.starting_folder, show_work_message=args.progress
-        )
-        sorted_sub_paths = sorted(sub_paths)
-        _write_subpaths_to_archive(sorted_sub_paths, unique_path.folder_archive)
-        return result_tuple("The folder has been archived.", 0)
+    # Do tasks like path validation and running the archive flag,
+    # as they need the ability to exit very early.
+    unique_path, early_exit = _do_pre_checksumming_tasks(
+        paths_to_make=paths_to_make,
+        main_return_constructor=result_tuple,
+        starting_path=args.starting_folder,
+        starting_path_required=starting_path_required,
+        write_archive=args.archive_folder,
+        show_progress=args.progress,
+    )
+    if early_exit:
+        return early_exit
 
     # Run as a Unix-style filter if an appropriate arg has been passed.
     if filter_mode:
