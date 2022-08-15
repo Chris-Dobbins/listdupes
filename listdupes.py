@@ -425,20 +425,27 @@ def _make_unique_paths(paths_to_make, destination=("~", "home folder")):
     return result_tuple(*unique_paths)
 
 
-def _starting_path_is_invalid(path):
+def _starting_path_is_invalid(path, read_archive=False):
     """Determine if the path is an existing folder.
 
     Args:
         path: An instance of pathlib.Path or its subclasses.
+        read_archive: A bool. Defaults to False.
 
     Returns:
         A string describing why the path is invalid, or an empty string.
     """
 
-    if not path:
-        return "A starting folder is required."
-    if not path.exists():
+    if read_archive and not path:
+        return "An archive file is required."
+    elif read_archive and not path.exists():
         return "No such file exist at that location."
+    elif read_archive and path.is_dir():
+        return "The starting path must be a file."
+    elif not path:
+        return "A starting folder is required."
+    elif not path.exists():
+        return "No such folder exist at that location."
     elif not path.is_dir():
         return "The starting path must be a folder."
     else:
@@ -478,6 +485,7 @@ def _do_pre_checksumming_tasks(
     main_return_constructor,
     starting_path,
     starting_path_required,
+    read_archive,
     write_archive,
     show_progress,
 ):
@@ -510,7 +518,9 @@ def _do_pre_checksumming_tasks(
         return result_tuple(None, main_return_constructor(str(e), 1))
 
     # Exit early if a starting path is required and the path is invalid.
-    issue_with_starting_path = _starting_path_is_invalid(starting_path)
+    issue_with_starting_path = _starting_path_is_invalid(
+        starting_path, read_archive=read_archive
+    )
     if issue_with_starting_path and starting_path_required:
         return result_tuple(None, main_return_constructor(issue_with_starting_path, 1))
 
@@ -975,7 +985,7 @@ def main(overriding_args=None):
         output_ext = format_arg = "csv"
     traditional_unix_stdin_arg = pathlib.Path("-")
     filter_mode = args.filter or args.starting_folder == traditional_unix_stdin_arg
-    starting_path_required = not filter_mode and not args.read_archive
+    starting_path_required = not filter_mode
     hardcoded_cache_path = pathlib.Path("~", "listdupes_cache").expanduser()
     paths_to_make = [
         (f"listdupes_output.{output_ext}", "output file"),
@@ -990,6 +1000,7 @@ def main(overriding_args=None):
         main_return_constructor=result_tuple,
         starting_path=args.starting_folder,
         starting_path_required=starting_path_required,
+        read_archive=args.read_archive,
         write_archive=args.archive_folder,
         show_progress=args.progress,
     )
