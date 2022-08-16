@@ -736,9 +736,19 @@ def _checksum_file_and_store_outcome(file_path, results_container, errors_contai
             a path with a string describing the error that file raised.
     """
 
+    chunk_size = 524288
     try:
         with open(file_path, mode="rb") as file:
-            checksum = checksummer(file.read())
+
+            # The callable passed to iter() can't take args, so we define
+            # it here to allow it to enclose the file object it needs.
+            def chunk_of_bytes_from_file():
+                return file.read(chunk_size)
+
+            chunk_iterator = iter(chunk_of_bytes_from_file, b"")
+            checksum = checksummer(chunk_iterator.__next__(), 0)
+            for chunk_of_bytes in chunk_iterator:
+                checksum = checksummer(chunk_of_bytes, checksum)
     except IsADirectoryError:
         return  # Don't count a directory as an error, just move on.
     except PermissionError as e:
