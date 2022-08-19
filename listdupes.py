@@ -482,7 +482,7 @@ def _find_sub_paths(starting_folder, return_set=False, show_work_message=False):
         return set(sub_paths)
 
 
-def _write_subpaths_to_archive(sub_paths, starting_folder, file_path, **kwargs):
+def _write_archive_to(file_path, sub_paths, starting_folder, **kwargs):
     """Dump the subpaths to an archive file."""
     kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
     kwargs_for_open.update(**kwargs)  # Allows override of defaults.
@@ -490,8 +490,8 @@ def _write_subpaths_to_archive(sub_paths, starting_folder, file_path, **kwargs):
     current_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
     json_safe_starting_folder = str(starting_folder)
     archive = {
-        "created": current_time,
-        "starting_folder": json_safe_starting_folder,
+        "creation_time": current_time,
+        "starting_path": json_safe_starting_folder,
         "sub_paths": json_safe_subpaths,
     }
     with open(file_path, **kwargs_for_open) as json_file:
@@ -547,20 +547,30 @@ def _do_pre_checksumming_tasks(
     if write_archive:
         sub_paths = _find_sub_paths(starting_path, show_work_message=show_progress)
         sorted_sub_paths = sorted(sub_paths)
-        _write_subpaths_to_archive(
-            sorted_sub_paths, starting_path, unique_path.folder_archive
-        )
+        _write_archive_to(unique_path.folder_archive, sorted_sub_paths, starting_path)
         message = "The folder has been archived."
         return result_tuple(None, main_return_constructor(message, 0))
 
     return result_tuple(unique_path, None)
 
 
-def _cache_checksums_to(file, paths_and_sums, os_errors, place, **kwargs):
+def _write_cache_to(
+    cache_details,
+    paths_and_sums,
+    os_errors,
+    place,
+    **kwargs,
+):
     """Write the state of checksum_files function to a file.
 
     Args:
-        file: A path-like object or integer file descriptor.
+        cache_details: A named tuple ('path', 'archive_creation_time',
+            'starting_path_from_archive') where 'file' is
+            an instance of pathlib.Path or its subclasses,
+            'archive_creation_time' is a float representation of
+            a timestamp and 'starting_path_from_archive' is an instance
+            of pathlib.Path or its subclasses. Any of the values
+            can be None.
         paths_and_sums: A tuple (path-like object, Int).
         os_errors: A dictionary with info on suppressed os errors
         place: An integer representing the last completed checksum.
@@ -571,25 +581,42 @@ def _cache_checksums_to(file, paths_and_sums, os_errors, place, **kwargs):
     kwargs_for_open.update(**kwargs)  # Allows override of defaults.
     if not paths_and_sums:  # If there are no checksums return early.
         return None
-    paths_and_sums = [(str(path), checksum) for path, checksum in paths_and_sums]
-    os_errors = {k: list(v) for k, v in os_errors.items()}
-    cache = {"place": place, "os_errors": os_errors, "paths_and_sums": paths_and_sums}
-    with open(file, **kwargs_for_open) as cache_file:
+    json_safe_paths_and_sums = [
+        (str(path), checksum) for path, checksum in paths_and_sums
+    ]
+    json_safe_os_errors = {k: list(v) for k, v in os_errors.items()}
+    json_safe_starting_path_from_archive = str(cache_details.starting_path_from_archive)
+    cache = {
+        "archive_creation_time": cache_details.archive_creation_time,
+        "starting_path_from_archive": json_safe_starting_path_from_archive,
+        "place": place,
+        "os_errors": json_safe_os_errors,
+        "paths_and_sums": json_safe_paths_and_sums,
+    }
+    with open(cache_details.path, **kwargs_for_open) as cache_file:
         json.dump(cache, cache_file)
 
 
 def _read_cache(file):
     """Read and return the cached state of a checksum_files function."""
     with open(file) as cache_file:
-        cache = json.load(cache_file)
-    str_paths_and_sums = cache["paths_and_sums"]
-    listed_os_errors = cache["os_errors"]
-    paths_and_sums = [
-        (pathlib.Path(str_path), checksum) for str_path, checksum in str_paths_and_sums
+        cached = json.load(cache_file)
+    cached["os_errors"] = {k: set(v) for k, v in cached["os_errors"].items()}
+    cached["paths_and_sums"] = [
+        (pathlib.Path(x), y) for x, y in cached["paths_and_sums"]
     ]
-    os_errors = {k: set(v) for k, v in listed_os_errors.items()}
-    place = cache["place"]
-    return {"place": place, "os_errors": os_errors, "paths_and_sums": paths_and_sums}
+    return cached
+
+
+def _read_archive(file):
+    """Read and return the starting folder archive."""
+    with open(file) as archive_file:
+        archived = json.load(archive_file)
+    archived["starting_path"] = pathlib.Path(archived["starting_path"])
+    archived["sub_paths"] = [
+        pathlib.Path(str_path) for str_path in archived["sub_paths"]
+    ]
+    return archived
 
 
 def _describe_old_archive(creation_timestamp):
@@ -624,7 +651,7 @@ def get_checksum_input_values(
     starting_path,
     show_progress,
     read_from_archive=False,
-    cache_file_path=None,
+    cache_path=None,
 ):
     """Return the initial values to pass to a checksum function.
 
@@ -634,12 +661,13 @@ def get_checksum_input_values(
             function should print a message when it starts.
         read_from_archive: A bool determining if values should be read
             from an archive and possibly a cache. Defaults to False.
-        cache_file_path: An instance of pathlib.Path or its subclasses
+        cache_path: An instance of pathlib.Path or its subclasses
             representing the location to check for a cache.
             Defaults to None.
 
     Returns:
-        A named tuple ('paths', 'paths_and_sums', 'os_errors', 'place').
+        A named tuple ('paths', 'paths_and_sums', 'os_errors', 'place',
+        'created', 'starting_folder').
 
         'paths' is a list of pathlib.Path objects.
 
@@ -655,11 +683,21 @@ def get_checksum_input_values(
         'place' is an integer representing the index of the last file
         in an archive to be checksummed and cached. If no cache exists
         it defaults to 0.
+
+        'cache_details' is a named tuple
+        ('path', 'archive_creation_time', 'starting_path_from_archive')
+        where 'path' is either an instance of pathlib.Path (or its
+        subclasses) or None, 'archive_creation_time' is either
+        a float or None, and 'starting_path_from_archive' is either
+        an instance ofpathlib.Path (or its subclasses), or None.
     """
 
     result_tuple = collections.namedtuple(
         "get_checksum_input_values_return_tuple",
-        ["paths", "paths_and_sums", "os_errors", "place"],
+        ["paths", "paths_and_sums", "os_errors", "place", "cache_details"],
+    )
+    cache_details_tuple = collections.namedtuple(
+        "cache_details", ["path", "archive_creation_time", "starting_path_from_archive"]
     )
     os_errors = {
         "permission_errors": set(),
@@ -669,32 +707,59 @@ def get_checksum_input_values(
     escape_codes = ("\x1b[1m", "\x1b[0m") if sys.stderr.isatty() else ("", "")
     bold, reset_style = escape_codes
 
-    if read_from_archive and cache_file_path and cache_file_path.exists():
-        with open(starting_path) as json_file:
-            archive = json.load(json_file)
-        old_archive_description = _describe_old_archive(archive["created"])
+    if read_from_archive and cache_path and cache_path.exists():
+        archived = _read_archive(starting_path)
+        old_archive_description = _describe_old_archive(archived["creation_time"])
         if old_archive_description:
             print(bold, old_archive_description, reset_style, sep="", file=sys.stderr)
-        all_sub_paths = [pathlib.Path(str_path) for str_path in archive["sub_paths"]]
-        cached = _read_cache(cache_file_path)
+        cached = _read_cache(cache_path)
         place_in_sub_paths = cached["place"]
-        paths = all_sub_paths[place_in_sub_paths:]
+        paths = archived["sub_paths"][place_in_sub_paths:]
+        cache_details = cache_details_tuple(
+            cache_path,
+            cached["archive_creation_time"],
+            cached["starting_path_from_archive"],
+        )
         return result_tuple(
-            paths, cached["paths_and_sums"], cached["os_errors"], cached["place"]
+            paths,
+            cached["paths_and_sums"],
+            cached["os_errors"],
+            cached["place"],
+            cache_details,
         )
     elif read_from_archive:
-        with open(starting_path) as json_file:
-            archive = json.load(json_file)
-        old_archive_description = _describe_old_archive(archive["created"])
+        archived = _read_archive(starting_path)
+        old_archive_description = _describe_old_archive(archived["creation_time"])
         if old_archive_description:
             print(bold, old_archive_description, reset_style, sep="", file=sys.stderr)
-        paths = [pathlib.Path(str_path) for str_path in archive["sub_paths"]]
-        return result_tuple(paths, [], os_errors, 0)
+        cache_details = cache_details_tuple(
+            cache_path,
+            archived["creation_time"],
+            archived["starting_path"],
+        )
+        return result_tuple(
+            archived["sub_paths"],
+            [],
+            os_errors,
+            0,
+            cache_details,
+        )
     else:
         paths = _find_sub_paths(
             starting_path, show_work_message=show_progress, return_set=show_progress
         )
-        return result_tuple(paths, [], os_errors, 0)
+        cache_details = cache_details_tuple(
+            cache_path,
+            None,
+            None,
+        )
+        return result_tuple(
+            paths,
+            [],
+            os_errors,
+            0,
+            cache_details,
+        )
 
 
 def _check_path_for_disconnection(file_path):
@@ -755,7 +820,12 @@ def _checksum_file_and_store_outcome(file_path, results_container, errors_contai
 
 
 def checksum_files(
-    paths, results_state, errors_state, place_state=0, cache_path=None, sort_key=None
+    paths,
+    results_state,
+    errors_state,
+    place_state=0,
+    cache_details=None,
+    sort_key=None,
 ):
     """Checksum files and return their paths, checksums, and errors.
 
@@ -771,8 +841,13 @@ def checksum_files(
         place_state: An integer representing the index of the last file
             in an archive to be checksummed and cached.
             If no cache exists it defaults to 0.
-        cache_path: An instance of pathlib.Path or its subclasses
-            representing the location of a cache. The default is None.
+        cache_details: Either None or a named tuple ('path',
+            'archive_creation_time', 'starting_path_from_archive') where
+             'file' is an instance of pathlib.Path or its subclasses,
+             'archive_creation_time' is a float representation of
+             a timestamp and 'starting_path_from_archive' is an instance
+             of pathlib.Path or its subclasses. Any of the values of the
+             tuple can be None. The default value of the kwarg is None.
         sort_key: A function for sorting the returned collections.
             The default of None dictates an ascending sort.
 
@@ -794,16 +869,21 @@ def checksum_files(
             place = index
             _checksum_file_and_store_outcome(file_path, paths_and_sums, os_errors)
     finally:
-        if cache_path:
+        if cache_details:
             total_place = place_state + place
-            _cache_checksums_to(cache_path, paths_and_sums, os_errors, total_place)
+            _write_cache_to(cache_details, paths_and_sums, os_errors, total_place)
     paths_and_sums.sort(key=sort_key)
     os_errors = {k: sorted(v, key=sort_key) for k, v in os_errors.items()}
     return result_tuple(paths_and_sums, os_errors)
 
 
 def checksum_files_and_show_progress(
-    paths, results_state, errors_state, place_state, cache_path=None, sort_key=None
+    paths,
+    results_state,
+    errors_state,
+    place_state=0,
+    cache_details=None,
+    sort_key=None,
 ):
     """As checksum_files but print the loop's progress to terminal."""
     checksum_progress = _ProgressCounter(
@@ -825,9 +905,9 @@ def checksum_files_and_show_progress(
             _checksum_file_and_store_outcome(file_path, paths_and_sums, os_errors)
             checksum_progress.print_counter(index)
     finally:
-        if cache_path:
+        if cache_details:
             total_place = place_state + place
-            _cache_checksums_to(cache_path, paths_and_sums, os_errors, total_place)
+            _write_cache_to(cache_details, paths_and_sums, os_errors, total_place)
         checksum_progress.end_count()
     paths_and_sums.sort(key=sort_key)
     os_errors = {k: sorted(v, key=sort_key) for k, v in os_errors.items()}
@@ -886,7 +966,7 @@ def locate_dupes_and_show_progress(checksum_result, sort_key=None):
     return dupes
 
 
-def search_for_dupes(checksum_input, show_progress=False, cache_path=None):
+def search_for_dupes(checksum_input, show_progress=False):
     """Search a collection of paths for duplicate files.
 
     Args:
@@ -894,9 +974,6 @@ def search_for_dupes(checksum_input, show_progress=False, cache_path=None):
             get_checksum_input_values().
         show_progress: A bool indicating whether to display the progress
             of checksumming and comparison processes. Defaults to False.
-        cache_path: An instance of pathlib.Path or its subclasses
-            representing the location of a cache. The default is None.
-
     Returns:
         A named tuple (dupes, description, return_code), where dupes is
         a Dupes object (As per the return value of locate_dupes), and
@@ -915,7 +992,7 @@ def search_for_dupes(checksum_input, show_progress=False, cache_path=None):
             checksum_input.paths_and_sums,
             checksum_input.os_errors,
             place_state=checksum_input.place,
-            cache_path=cache_path,
+            cache_details=checksum_input.cache_details,
         )
         dupes = locate_dupes_and_show_progress(checksum_result)
     else:
@@ -924,7 +1001,7 @@ def search_for_dupes(checksum_input, show_progress=False, cache_path=None):
             checksum_input.paths_and_sums,
             checksum_input.os_errors,
             place_state=checksum_input.place,
-            cache_path=cache_path,
+            cache_details=checksum_input.cache_details,
         )
         dupes = locate_dupes(checksum_result)
 
@@ -1068,15 +1145,11 @@ def main(overriding_args=None):
         args.starting_folder,
         args.progress,
         read_from_archive=args.read_archive,
-        cache_file_path=hardcoded_cache_path,
+        cache_path=hardcoded_cache_path,
     )
 
     # Search for dupes and describe the result to the user.
-    search_result = search_for_dupes(
-        checksum_input_values,
-        show_progress=args.progress,
-        cache_path=(hardcoded_cache_path if args.read_archive else None),
-    )
+    search_result = search_for_dupes(checksum_input_values, show_progress=args.progress)
     os_errors = search_result.dupes.checksum_result.os_errors
     print(search_result.description, file=sys.stderr)
 
