@@ -597,17 +597,6 @@ def _write_cache_to(
         json.dump(cache, cache_file)
 
 
-def _read_cache(file):
-    """Read and return the cached state of a checksum_files function."""
-    with open(file) as cache_file:
-        cached = json.load(cache_file)
-    cached["os_errors"] = {k: set(v) for k, v in cached["os_errors"].items()}
-    cached["paths_and_sums"] = [
-        (pathlib.Path(x), y) for x, y in cached["paths_and_sums"]
-    ]
-    return cached
-
-
 def _read_archive(file):
     """Read and return the starting folder archive."""
     with open(file) as archive_file:
@@ -645,6 +634,17 @@ def _describe_old_archive(creation_timestamp):
         return f"This archive was made over {description} ago."
     else:
         return ""
+
+
+def _read_cache(file):
+    """Read and return the cached state of a checksum_files function."""
+    with open(file) as cache_file:
+        cached = json.load(cache_file)
+    cached["os_errors"] = {k: set(v) for k, v in cached["os_errors"].items()}
+    cached["paths_and_sums"] = [
+        (pathlib.Path(x), y) for x, y in cached["paths_and_sums"]
+    ]
+    return cached
 
 
 def get_checksum_input_values(
