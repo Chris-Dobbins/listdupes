@@ -18,7 +18,7 @@ __all__ = [
     "search_for_dupes",
     "PreviousFileNotFoundError",
 ]
-__version__ = "6.0.0-beta.1"
+__version__ = "6.0.0-beta.2"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
@@ -849,7 +849,18 @@ def _check_path_for_disconnection(file_path):
         )
 
 
-def _checksum_file_and_store_outcome(file_path, results_container, errors_container):
+def _chunk_file(file_object_to_chunk, chunk_size=524288):
+    """Yield from the file a chunk of the specified size."""
+    while True:
+        chunk = file_object_to_chunk.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+
+
+def _checksum_file_and_store_outcome(
+    file_path, results_container, errors_container, generator=_chunk_file
+):
     """Checksum a file, storing the result or error via side-effect.
 
     Args:
@@ -861,11 +872,16 @@ def _checksum_file_and_store_outcome(file_path, results_container, errors_contai
             os errors mapped to sets which may be empty, or may contain
             tuples of (Str, Str) pairing a string representation of
             a path with a string describing the error that file raised.
+        generator: The generator function taking one positonal arg
+            which is used to split the file. The default is _chunk_file.
     """
 
     try:
         with open(file_path, mode="rb") as file:
-            checksum = checksummer(file.read())
+            chunk_generator = generator(file)
+            checksum = checksummer(chunk_generator.__next__(), 0)
+            for chunk_of_bytes in chunk_generator:
+                checksum = checksummer(chunk_of_bytes, checksum)
     except IsADirectoryError:
         return  # Don't count a directory as an error, just move on.
     except PermissionError as e:
