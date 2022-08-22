@@ -661,6 +661,9 @@ def _read_cache(file):
     cached["archive_creation_time"] = datetime.datetime.fromtimestamp(
         cached["archive_creation_time"], tz=datetime.timezone.utc
     )
+    cached["starting_path_from_archive"] = pathlib.Path(
+        cached["starting_path_from_archive"]
+    )
     cached["os_errors"] = {k: set(v) for k, v in cached["os_errors"].items()}
     cached["paths_and_sums"] = [
         (pathlib.Path(x), y) for x, y in cached["paths_and_sums"]
