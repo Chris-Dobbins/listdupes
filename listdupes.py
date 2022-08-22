@@ -486,6 +486,9 @@ def _read_archive(file):
     """Read, verify, and return the starting folder archive."""
     with open(file) as archive_file:
         archived = json.load(archive_file)
+    archived["creation_time"] = datetime.datetime.fromtimestamp(
+        archived["creation_time"], tz=datetime.timezone.utc
+    )
     archived["starting_path"] = pathlib.Path(archived["starting_path"])
     archived["sub_paths"] = [
         pathlib.Path(str_path) for str_path in archived["sub_paths"]
@@ -595,10 +598,9 @@ def _write_cache_to(
         cache_details: A named tuple ('path', 'archive_creation_time',
             'starting_path_from_archive') where 'file' is
             an instance of pathlib.Path or its subclasses,
-            'archive_creation_time' is a float representation of
-            a timestamp and 'starting_path_from_archive' is an instance
-            of pathlib.Path or its subclasses. Any of the values
-            can be None.
+            'archive_creation_time' is a datetime object and
+            'starting_path_from_archive' is an instance of pathlib.Path
+            or its subclasses. Any of the values can be None.
         paths_and_sums: A tuple (path-like object, Int).
         os_errors: A dictionary with info on suppressed os errors
         place: An integer representing the last completed checksum.
@@ -609,13 +611,14 @@ def _write_cache_to(
     kwargs_for_open.update(**kwargs)  # Allows override of defaults.
     if not paths_and_sums:  # If there are no checksums return early.
         return None
+    json_safe_archive_creation_time = cache_details.archive_creation_time.timestamp()
     json_safe_paths_and_sums = [
         (str(path), checksum) for path, checksum in paths_and_sums
     ]
     json_safe_os_errors = {k: list(v) for k, v in os_errors.items()}
     json_safe_starting_path_from_archive = str(cache_details.starting_path_from_archive)
     cache = {
-        "archive_creation_time": cache_details.archive_creation_time,
+        "archive_creation_time": json_safe_archive_creation_time,
         "starting_path_from_archive": json_safe_starting_path_from_archive,
         "place": place,
         "os_errors": json_safe_os_errors,
@@ -625,11 +628,9 @@ def _write_cache_to(
         json.dump(cache, cache_file)
 
 
-def _describe_old_archive(creation_timestamp):
+def _describe_old_archive(archive_creation_time):
     """If an archive is old return a description of how old it is."""
-    utc = datetime.timezone.utc
-    current_time = datetime.datetime.now(utc)
-    archive_creation_time = datetime.datetime.fromtimestamp(creation_timestamp, tz=utc)
+    current_time = datetime.datetime.now(datetime.timezone.utc)
     time_between_creation_and_now = current_time - archive_creation_time
     a_year = datetime.timedelta(weeks=52)
     half_a_year = datetime.timedelta(days=183)
@@ -657,6 +658,9 @@ def _read_cache(file):
     """Read and return the cached state of a checksum_files function."""
     with open(file) as cache_file:
         cached = json.load(cache_file)
+    cached["archive_creation_time"] = datetime.datetime.fromtimestamp(
+        cached["archive_creation_time"], tz=datetime.timezone.utc
+    )
     cached["os_errors"] = {k: set(v) for k, v in cached["os_errors"].items()}
     cached["paths_and_sums"] = [
         (pathlib.Path(x), y) for x, y in cached["paths_and_sums"]
@@ -678,8 +682,8 @@ def get_checksum_input_values(
             function should print a message when it starts.
         archived_data: Either an empty dict or one holding the contents
             of an archive file. Defaults to empty.
-        cache_path: An instance of pathlib.Path or its subclasses
-            representing the location to check for a cache.
+        cache_path: Either None or an instance of pathlib.Path
+            (or its subclasses) representing where to check for a cache.
             Defaults to None.
 
     Returns:
@@ -701,12 +705,12 @@ def get_checksum_input_values(
         in an archive to be checksummed and cached. If no cache exists
         it defaults to 0.
 
-        'cache_details' is a named tuple
+        'cache_details' is either None or a named tuple
         ('path', 'archive_creation_time', 'starting_path_from_archive')
-        where 'path' is either an instance of pathlib.Path (or its
-        subclasses) or None, 'archive_creation_time' is either
-        a float or None, and 'starting_path_from_archive' is either
-        an instance ofpathlib.Path (or its subclasses), or None.
+        where 'path' is an instance of pathlib.Path (or its subclasses),
+        'archive_creation_time' is a datetime object, and
+        'starting_path_from_archive' is either an instance of
+        pathlib.Path (or its subclasses).
     """
 
     result_tuple = collections.namedtuple(
@@ -743,7 +747,7 @@ def get_checksum_input_values(
             cached["place"],
             cache_details,
         )
-    elif archived_data:
+    elif archived_data and cache_path:
         old_archive_description = _describe_old_archive(archived_data["creation_time"])
         if old_archive_description:
             print(bold, old_archive_description, reset_style, sep="", file=sys.stderr)
@@ -763,11 +767,7 @@ def get_checksum_input_values(
         paths = _find_sub_paths(
             starting_path, show_work_message=show_progress, return_set=show_progress
         )
-        cache_details = cache_details_tuple(
-            cache_path,
-            None,
-            None,
-        )
+        cache_details = None
         return result_tuple(
             paths,
             [],
@@ -858,11 +858,10 @@ def checksum_files(
             If no cache exists it defaults to 0.
         cache_details: Either None or a named tuple ('path',
             'archive_creation_time', 'starting_path_from_archive') where
-             'file' is an instance of pathlib.Path or its subclasses,
-             'archive_creation_time' is a float representation of
-             a timestamp and 'starting_path_from_archive' is an instance
-             of pathlib.Path or its subclasses. Any of the values of the
-             tuple can be None. The default value of the kwarg is None.
+            'file' is an instance of pathlib.Path or its subclasses,
+            'archive_creation_time' is a datetime object and
+            'starting_path_from_archive' is an instance of pathlib.Path
+            or its subclasses. The default value of the kwarg is None.
         sort_key: A function for sorting the returned collections.
             The default of None dictates an ascending sort.
 
