@@ -496,6 +496,26 @@ def _read_archive(file):
     return archived
 
 
+def _get_creation_time_from_cache(file_path):
+    """Return a cache's archive creation time with only a short read."""
+    with open(file_path) as file:
+        first_kilobyte_of_file = file.read(1024)
+    possible_float = None
+    start_of_file, comma, _ = first_kilobyte_of_file.partition(",")
+    if comma:
+        _, key_value_seperator, substring_before_comma = start_of_file.rpartition(": ")
+        if key_value_seperator:
+            possible_float = substring_before_comma
+    try:
+        possible_timestamp = float(possible_float)
+        creation_time = datetime.datetime.fromtimestamp(
+            possible_timestamp, tz=datetime.timezone.utc
+        )
+    except (ValueError, TypeError, OSError, OverflowError):
+        return None
+    return creation_time
+
+
 def _write_archive_to(file_path, sub_paths, starting_folder, **kwargs):
     """Dump the subpaths to an archive file."""
     kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
@@ -520,6 +540,7 @@ def _do_pre_checksumming_tasks(
     starting_path_required,
     read_archive,
     write_archive,
+    hardcoded_cache_path,
     show_progress,
 ):
     """Give main() the means to either proceed or exit early.
@@ -562,7 +583,8 @@ def _do_pre_checksumming_tasks(
             None, {}, main_return_constructor(issue_with_starting_path, 1)
         )
 
-    # Exit early if the archive isn't a valid file.
+    # Exit early if the archive isn't a valid file
+    # or doesn't match the existing cache.
     if read_archive:
         archive = {}
         try:
@@ -572,6 +594,24 @@ def _do_pre_checksumming_tasks(
             return result_tuple(
                 unique_path, archive, main_return_constructor(message, 1)
             )
+
+        if hardcoded_cache_path.exists():
+            creation_time_from_cache = _get_creation_time_from_cache(
+                hardcoded_cache_path
+            )
+            # Using the archive's creation time as a quasi-unique ID
+            # check that the archive and cache match.
+            if not creation_time_from_cache == archive["creation_time"]:
+                message = (
+                    "The cache file is holding work which was done on another"
+                    " archive.\n"
+                    "Please save that work by moving the cache file to a seperate"
+                    " location\n"
+                    "or simply delete the cache if you no longer need it."
+                )
+                return result_tuple(
+                    unique_path, archive, main_return_constructor(message, 1)
+                )
         return result_tuple(unique_path, archive, None)
 
     # Archive subpaths to a file and exit if -a has been passed.
@@ -1145,6 +1185,7 @@ def main(overriding_args=None):
         starting_path_required=starting_path_required,
         read_archive=args.read_archive,
         write_archive=args.archive_folder,
+        hardcoded_cache_path=hardcoded_cache_path,
         show_progress=args.progress,
     )
     if early_exit:
