@@ -722,7 +722,18 @@ def _check_path_for_disconnection(file_path):
         )
 
 
-def _checksum_file_and_store_outcome(file_path, results_container, errors_container):
+def _chunk_file(file_object_to_chunk, chunk_size=524288):
+    """Yield from the file a chunk of the specified size."""
+    while True:
+        chunk = file_object_to_chunk.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+
+
+def _checksum_file_and_store_outcome(
+    file_path, results_container, errors_container, generator=_chunk_file
+):
     """Checksum a file, storing the result or error via side-effect.
 
     Args:
@@ -734,20 +745,15 @@ def _checksum_file_and_store_outcome(file_path, results_container, errors_contai
             which are mapped to sets which may be empty, or may contain
             tuples of (Str, Str) pairing a string representation of
             a path with a string describing the error that file raised.
+        generator: The generator function taking one positonal arg
+            which is used to split the file. The default is _chunk_file.
     """
 
-    chunk_size = 524288
     try:
         with open(file_path, mode="rb") as file:
-
-            # The callable passed to iter() can't take args, so we define
-            # it here to allow it to enclose the file object it needs.
-            def chunk_of_bytes_from_file():
-                return file.read(chunk_size)
-
-            chunk_iterator = iter(chunk_of_bytes_from_file, b"")
-            checksum = checksummer(chunk_iterator.__next__(), 0)
-            for chunk_of_bytes in chunk_iterator:
+            chunk_generator = generator(file)
+            checksum = checksummer(chunk_generator.__next__(), 0)
+            for chunk_of_bytes in chunk_generator:
                 checksum = checksummer(chunk_of_bytes, checksum)
     except IsADirectoryError:
         return  # Don't count a directory as an error, just move on.
