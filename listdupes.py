@@ -482,9 +482,11 @@ def _find_sub_paths(starting_folder, return_set=False, show_work_message=False):
         return set(sub_paths)
 
 
-def _read_archive(file):
+def _read_archive(file, **kwargs):
     """Read, verify, and return the starting folder archive."""
-    with open(file) as archive_file:
+    kwargs_for_open = {"mode": "r", "encoding": "utf-8", "errors": "replace"}
+    kwargs_for_open.update(**kwargs)  # Allows override of defaults.
+    with open(file, **kwargs_for_open) as archive_file:
         archived = json.load(archive_file)
     archived["creation_time"] = datetime.datetime.fromtimestamp(
         archived["creation_time"], tz=datetime.timezone.utc
@@ -694,9 +696,11 @@ def _describe_old_archive(archive_creation_time):
         return ""
 
 
-def _read_cache(file):
+def _read_cache(file, **kwargs):
     """Read and return the cached state of a checksum_files function."""
-    with open(file) as cache_file:
+    kwargs_for_open = {"mode": "r", "encoding": "utf-8", "errors": "replace"}
+    kwargs_for_open.update(**kwargs)  # Allows override of defaults.
+    with open(file, **kwargs_for_open) as cache_file:
         cached = json.load(cache_file)
     cached["archive_creation_time"] = datetime.datetime.fromtimestamp(
         cached["archive_creation_time"], tz=datetime.timezone.utc
