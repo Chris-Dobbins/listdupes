@@ -1171,6 +1171,10 @@ def main(overriding_args=None):
         search_result.dupes.write_any_items_to(sys.stdout.fileno(), format=format_arg)
         return result_tuple("", 1)
 
+    # Delete the cache if it's been read and results have been output.
+    if args.read_archive and hardcoded_cache_path.exists():
+        hardcoded_cache_path.unlink()
+
     save_description = (
         f"The list of duplicates has been saved to {unique_path.output_file}."
     )
