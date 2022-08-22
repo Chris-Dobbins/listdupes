@@ -482,7 +482,7 @@ def _find_sub_paths(starting_folder, return_set=False, show_work_message=False):
         return set(sub_paths)
 
 
-def _read_archive(file, **kwargs):
+def _read_archive_from(file, **kwargs):
     """Read, verify, and return the starting folder archive."""
     kwargs_for_open = {"mode": "r", "encoding": "utf-8", "errors": "replace"}
     kwargs_for_open.update(**kwargs)  # Allows override of defaults.
@@ -590,7 +590,7 @@ def _do_pre_checksumming_tasks(
     if read_archive:
         archive = {}
         try:
-            archive = _read_archive(starting_path)
+            archive = _read_archive_from(starting_path)
         except (json.JSONDecodeError, ValueError, KeyError):
             message = "The file you have chosen is not a valid archive."
             return result_tuple(
@@ -653,7 +653,7 @@ def _describe_old_archive(archive_creation_time):
         return ""
 
 
-def _read_cache(file, **kwargs):
+def _read_cache_from(file, **kwargs):
     """Read and return the cached state of a checksum_files function."""
     kwargs_for_open = {"mode": "r", "encoding": "utf-8", "errors": "replace"}
     kwargs_for_open.update(**kwargs)  # Allows override of defaults.
@@ -736,7 +736,7 @@ def get_checksum_input_values(
         old_archive_description = _describe_old_archive(archived_data["creation_time"])
         if old_archive_description:
             print(bold, old_archive_description, reset_style, sep="", file=sys.stderr)
-        cached = _read_cache(cache_path)
+        cached = _read_cache_from(cache_path)
         place_in_sub_paths = cached["place"]
         paths = archived_data["sub_paths"][place_in_sub_paths:]
         cache_details = cache_details_tuple(
