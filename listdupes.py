@@ -482,6 +482,17 @@ def _find_sub_paths(starting_folder, return_set=False, show_work_message=False):
         return set(sub_paths)
 
 
+def _read_archive(file):
+    """Read, verify, and return the starting folder archive."""
+    with open(file) as archive_file:
+        archived = json.load(archive_file)
+    archived["starting_path"] = pathlib.Path(archived["starting_path"])
+    archived["sub_paths"] = [
+        pathlib.Path(str_path) for str_path in archived["sub_paths"]
+    ]
+    return archived
+
+
 def _write_archive_to(file_path, sub_paths, starting_folder, **kwargs):
     """Dump the subpaths to an archive file."""
     kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
@@ -518,30 +529,47 @@ def _do_pre_checksumming_tasks(
         main_return_constructor: Main()'s return value constructor.
         starting_folder: An instance of pathlib.Path or its subclasses.
         starting_path_required: A bool.
-        archive: A bool.
+        read_archive: A bool.
         show_progress: A bool.
 
     Return:
-        A named tuple ("unique_path", "early_exit") where
+        A named tuple ("unique_path", "archive", "early_exit") where
         'unique_path' is the returned value of _make_unique_paths() and
-        'early_exit' is a valid return value for main().
+        'archive' is either an empty dict or one holding the contents
+        of an archived file, and 'early_exit' is a valid return value
+        for main().
     """
 
     result_tuple = collections.namedtuple(
-        "do_pre_checksumming_tasks_return_tuple", ["unique_path", "early_exit"]
+        "do_pre_checksumming_tasks_return_tuple",
+        ["unique_path", "archive", "early_exit"],
     )
     # Determine the eventual paths of all necessary files.
     try:
         unique_path = _make_unique_paths(paths_to_make)
     except FileExistsError as e:
-        return result_tuple(None, main_return_constructor(str(e), 1))
+        return result_tuple(None, {}, main_return_constructor(str(e), 1))
 
     # Exit early if a starting path is required and the path is invalid.
     issue_with_starting_path = _starting_path_is_invalid(
         starting_path, read_archive=read_archive
     )
     if issue_with_starting_path and starting_path_required:
-        return result_tuple(None, main_return_constructor(issue_with_starting_path, 1))
+        return result_tuple(
+            None, {}, main_return_constructor(issue_with_starting_path, 1)
+        )
+
+    # Exit early if the archive isn't a valid file.
+    if read_archive:
+        archive = {}
+        try:
+            archive = _read_archive(starting_path)
+        except (json.JSONDecodeError, ValueError, KeyError):
+            message = "The file you have chosen is not a valid archive."
+            return result_tuple(
+                unique_path, archive, main_return_constructor(message, 1)
+            )
+        return result_tuple(unique_path, archive, None)
 
     # Archive subpaths to a file and exit if -a has been passed.
     if write_archive:
@@ -549,9 +577,9 @@ def _do_pre_checksumming_tasks(
         sorted_sub_paths = sorted(sub_paths)
         _write_archive_to(unique_path.folder_archive, sorted_sub_paths, starting_path)
         message = "The folder has been archived."
-        return result_tuple(None, main_return_constructor(message, 0))
+        return result_tuple(None, {}, main_return_constructor(message, 0))
 
-    return result_tuple(unique_path, None)
+    return result_tuple(unique_path, {}, None)
 
 
 def _write_cache_to(
@@ -597,17 +625,6 @@ def _write_cache_to(
         json.dump(cache, cache_file)
 
 
-def _read_archive(file):
-    """Read and return the starting folder archive."""
-    with open(file) as archive_file:
-        archived = json.load(archive_file)
-    archived["starting_path"] = pathlib.Path(archived["starting_path"])
-    archived["sub_paths"] = [
-        pathlib.Path(str_path) for str_path in archived["sub_paths"]
-    ]
-    return archived
-
-
 def _describe_old_archive(creation_timestamp):
     """If an archive is old return a description of how old it is."""
     utc = datetime.timezone.utc
@@ -650,7 +667,7 @@ def _read_cache(file):
 def get_checksum_input_values(
     starting_path,
     show_progress,
-    read_from_archive=False,
+    archived_data={},
     cache_path=None,
 ):
     """Return the initial values to pass to a checksum function.
@@ -659,8 +676,8 @@ def get_checksum_input_values(
         starting_path: An instance of pathlib.Path or its subclasses.
         show_progress: A bool indicating whether the path gathering
             function should print a message when it starts.
-        read_from_archive: A bool determining if values should be read
-            from an archive and possibly a cache. Defaults to False.
+        archived_data: Either an empty dict or one holding the contents
+            of an archive file. Defaults to empty.
         cache_path: An instance of pathlib.Path or its subclasses
             representing the location to check for a cache.
             Defaults to None.
@@ -707,14 +724,13 @@ def get_checksum_input_values(
     escape_codes = ("\x1b[1m", "\x1b[0m") if sys.stderr.isatty() else ("", "")
     bold, reset_style = escape_codes
 
-    if read_from_archive and cache_path and cache_path.exists():
-        archived = _read_archive(starting_path)
-        old_archive_description = _describe_old_archive(archived["creation_time"])
+    if archived_data and cache_path and cache_path.exists():
+        old_archive_description = _describe_old_archive(archived_data["creation_time"])
         if old_archive_description:
             print(bold, old_archive_description, reset_style, sep="", file=sys.stderr)
         cached = _read_cache(cache_path)
         place_in_sub_paths = cached["place"]
-        paths = archived["sub_paths"][place_in_sub_paths:]
+        paths = archived_data["sub_paths"][place_in_sub_paths:]
         cache_details = cache_details_tuple(
             cache_path,
             cached["archive_creation_time"],
@@ -727,18 +743,17 @@ def get_checksum_input_values(
             cached["place"],
             cache_details,
         )
-    elif read_from_archive:
-        archived = _read_archive(starting_path)
-        old_archive_description = _describe_old_archive(archived["creation_time"])
+    elif archived_data:
+        old_archive_description = _describe_old_archive(archived_data["creation_time"])
         if old_archive_description:
             print(bold, old_archive_description, reset_style, sep="", file=sys.stderr)
         cache_details = cache_details_tuple(
             cache_path,
-            archived["creation_time"],
-            archived["starting_path"],
+            archived_data["creation_time"],
+            archived_data["starting_path"],
         )
         return result_tuple(
-            archived["sub_paths"],
+            archived_data["sub_paths"],
             [],
             os_errors,
             0,
@@ -1121,7 +1136,7 @@ def main(overriding_args=None):
 
     # Do tasks like path validation and running the archive flag,
     # as they need the ability to exit very early.
-    unique_path, early_exit = _do_pre_checksumming_tasks(
+    unique_path, archive, early_exit = _do_pre_checksumming_tasks(
         paths_to_make=paths_to_make,
         main_return_constructor=result_tuple,
         starting_path=args.starting_folder,
@@ -1144,7 +1159,7 @@ def main(overriding_args=None):
     checksum_input_values = get_checksum_input_values(
         args.starting_folder,
         args.progress,
-        read_from_archive=args.read_archive,
+        archived_data=archive,
         cache_path=hardcoded_cache_path,
     )
 
