@@ -627,49 +627,6 @@ def _do_pre_checksumming_tasks(
     return result_tuple(unique_path, {}, None)
 
 
-def _write_cache_to(
-    cache_details,
-    paths_and_sums,
-    os_errors,
-    place,
-    **kwargs,
-):
-    """Write the state of checksum_files function to a file.
-
-    Args:
-        cache_details: A named tuple ('path', 'archive_creation_time',
-            'starting_path_from_archive') where 'file' is
-            an instance of pathlib.Path or its subclasses,
-            'archive_creation_time' is a datetime object and
-            'starting_path_from_archive' is an instance of pathlib.Path
-            or its subclasses. Any of the values can be None.
-        paths_and_sums: A tuple (path-like object, Int).
-        os_errors: A dictionary with info on suppressed os errors
-        place: An integer representing the last completed checksum.
-        **kwargs: Passed to the open function.
-    """
-
-    kwargs_for_open = {"mode": "w", "encoding": "utf-8", "errors": "replace"}
-    kwargs_for_open.update(**kwargs)  # Allows override of defaults.
-    if not paths_and_sums:  # If there are no checksums return early.
-        return None
-    json_safe_archive_creation_time = cache_details.archive_creation_time.timestamp()
-    json_safe_paths_and_sums = [
-        (str(path), checksum) for path, checksum in paths_and_sums
-    ]
-    json_safe_os_errors = {k: list(v) for k, v in os_errors.items()}
-    json_safe_starting_path_from_archive = str(cache_details.starting_path_from_archive)
-    cache = {
-        "archive_creation_time": json_safe_archive_creation_time,
-        "starting_path_from_archive": json_safe_starting_path_from_archive,
-        "place": place,
-        "os_errors": json_safe_os_errors,
-        "paths_and_sums": json_safe_paths_and_sums,
-    }
-    with open(cache_details.path, **kwargs_for_open) as cache_file:
-        json.dump(cache, cache_file)
-
-
 def _describe_old_archive(archive_creation_time):
     """If an archive is old return a description of how old it is."""
     current_time = datetime.datetime.now(datetime.timezone.utc)
@@ -824,6 +781,15 @@ def get_checksum_input_values(
         )
 
 
+def _chunk_file(file_object_to_chunk, chunk_size=524288):
+    """Yield from the file a chunk of the specified size."""
+    while True:
+        chunk = file_object_to_chunk.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+
+
 def _check_path_for_disconnection(file_path):
     """Check if any of a path's parent path segments can't be found.
 
@@ -847,15 +813,6 @@ def _check_path_for_disconnection(file_path):
         raise PreviousFileNotFoundError(
             message, missing_parent_path, filename2=longest_existing_parent
         )
-
-
-def _chunk_file(file_object_to_chunk, chunk_size=524288):
-    """Yield from the file a chunk of the specified size."""
-    while True:
-        chunk = file_object_to_chunk.read(chunk_size)
-        if not chunk:
-            break
-        yield chunk
 
 
 def _checksum_file_and_store_outcome(
@@ -895,6 +852,49 @@ def _checksum_file_and_store_outcome(
         errors_container["misc_errors"].add((e.filename, e.strerror))
         return
     results_container.append((file_path, checksum))
+
+
+def _write_cache_to(
+    cache_details,
+    paths_and_sums,
+    os_errors,
+    place,
+    **kwargs,
+):
+    """Write the state of checksum_files function to a file.
+
+    Args:
+        cache_details: A named tuple ('path', 'archive_creation_time',
+            'starting_path_from_archive') where 'file' is
+            an instance of pathlib.Path or its subclasses,
+            'archive_creation_time' is a datetime object and
+            'starting_path_from_archive' is an instance of pathlib.Path
+            or its subclasses. Any of the values can be None.
+        paths_and_sums: A tuple (path-like object, Int).
+        os_errors: A dictionary with info on suppressed os errors
+        place: An integer representing the last completed checksum.
+        **kwargs: Passed to the open function.
+    """
+
+    kwargs_for_open = {"mode": "w", "encoding": "utf-8", "errors": "replace"}
+    kwargs_for_open.update(**kwargs)  # Allows override of defaults.
+    if not paths_and_sums:  # If there are no checksums return early.
+        return None
+    json_safe_archive_creation_time = cache_details.archive_creation_time.timestamp()
+    json_safe_paths_and_sums = [
+        (str(path), checksum) for path, checksum in paths_and_sums
+    ]
+    json_safe_os_errors = {k: list(v) for k, v in os_errors.items()}
+    json_safe_starting_path_from_archive = str(cache_details.starting_path_from_archive)
+    cache = {
+        "archive_creation_time": json_safe_archive_creation_time,
+        "starting_path_from_archive": json_safe_starting_path_from_archive,
+        "place": place,
+        "os_errors": json_safe_os_errors,
+        "paths_and_sums": json_safe_paths_and_sums,
+    }
+    with open(cache_details.path, **kwargs_for_open) as cache_file:
+        json.dump(cache, cache_file)
 
 
 def checksum_files(
