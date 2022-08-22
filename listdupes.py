@@ -813,8 +813,8 @@ def _checksum_file_and_store_outcome(file_path, results_container, errors_contai
         results_container: A container which is either empty or which
             contains tuples of (path-like object, Int) which pair
             a path with the checksum of the associated file.
-        errors_container: A dictionary with keys for suppressed os errors
-            which are mapped to sets which may be empty, or may contain
+        errors_container: A dictionary with keys for suppressed
+            os errors mapped to sets which may be empty, or may contain
             tuples of (Str, Str) pairing a string representation of
             a path with a string describing the error that file raised.
     """
