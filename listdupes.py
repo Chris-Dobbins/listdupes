@@ -836,7 +836,14 @@ def _checksum_file_and_store_outcome(
     try:
         with open(file_path, mode="rb") as file:
             chunk_generator = generator(file)
-            checksum = checksummer(chunk_generator.__next__(), 0)
+            try:
+                first_chunk = chunk_generator.__next__()
+            except StopIteration:
+                no_data = b""
+                checksum = checksummer(no_data)
+                results_container.append((file_path, checksum))
+                return
+            checksum = checksummer(first_chunk, 0)
             for chunk_of_bytes in chunk_generator:
                 checksum = checksummer(chunk_of_bytes, checksum)
     except IsADirectoryError:
