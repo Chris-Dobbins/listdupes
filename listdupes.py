@@ -18,7 +18,7 @@ __all__ = [
     "search_for_dupes",
     "PreviousFileNotFoundError",
 ]
-__version__ = "6.0.0-beta.3"
+__version__ = "6.0.0-beta.4"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
