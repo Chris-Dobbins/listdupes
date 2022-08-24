@@ -553,13 +553,13 @@ def _do_pre_checksumming_tasks(
     Args:
         paths_to_make: A list of tuples, passed to _make_unique_paths().
         main_return_constructor: Main()'s return value constructor.
-        starting_folder: An instance of pathlib.Path or its subclasses.
+        starting_path: An instance of pathlib.Path or its subclasses.
         starting_path_required: A bool.
         read_archive: A bool.
         show_progress: A bool.
 
     Return:
-        A named tuple ("unique_path", "archive", "early_exit") where
+        A named tuple (unique_path, archive, early_exit) where
         'unique_path' is the returned value of _make_unique_paths() and
         'archive' is either an empty dict or one holding the contents
         of an archived file, and 'early_exit' is a valid return value
@@ -692,8 +692,8 @@ def get_checksum_input_values(
             Defaults to None.
 
     Returns:
-        A named tuple ('paths', 'paths_and_sums', 'os_errors', 'place',
-        'created', 'starting_folder').
+        A named tuple (paths, paths_and_sums, os_errors, place,
+        cache_details).
 
         'paths' is a list of pathlib.Path objects.
 
@@ -711,7 +711,7 @@ def get_checksum_input_values(
         it defaults to 0.
 
         'cache_details' is either None or a named tuple
-        ('path', 'archive_creation_time', 'starting_path_from_archive')
+        (path, archive_creation_time, starting_path_from_archive)
         where 'path' is an instance of pathlib.Path (or its subclasses),
         'archive_creation_time' is a datetime object, and
         'starting_path_from_archive' is either an instance of
@@ -872,12 +872,12 @@ def _write_cache_to(
     """Write the state of checksum_files function to a file.
 
     Args:
-        cache_details: A named tuple ('path', 'archive_creation_time',
-            'starting_path_from_archive') where 'file' is
+        cache_details: A named tuple (path, archive_creation_time,
+            starting_path_from_archive) where 'path' is
             an instance of pathlib.Path or its subclasses,
             'archive_creation_time' is a datetime object and
-            'starting_path_from_archive' is an instance of pathlib.Path
-            or its subclasses. Any of the values can be None.
+            'starting_path_from_archive' is an instance of
+            pathlib.Pathor its subclasses.
         paths_and_sums: A tuple (path-like object, Int).
         os_errors: A dictionary with info on suppressed os errors
         place: An integer representing the last completed checksum.
@@ -927,8 +927,8 @@ def checksum_files(
         place_state: An integer representing the index of the last file
             in an archive to be checksummed and cached.
             If no cache exists it defaults to 0.
-        cache_details: Either None or a named tuple ('path',
-            'archive_creation_time', 'starting_path_from_archive') where
+        cache_details: Either None or a named tuple (path,
+            archive_creation_time, starting_path_from_archive) where
             'file' is an instance of pathlib.Path or its subclasses,
             'archive_creation_time' is a datetime object and
             'starting_path_from_archive' is an instance of pathlib.Path
@@ -1060,10 +1060,10 @@ def search_for_dupes(checksum_input, show_progress=False):
         show_progress: A bool indicating whether to display the progress
             of checksumming and comparison processes. Defaults to False.
     Returns:
-        A named tuple (dupes, description, return_code), where dupes is
-        a Dupes object (As per the return value of locate_dupes), and
-        description and return_code are a string and an integer as per
-        the return of Dupes.status().
+        A named tuple (dupes, description, return_code), where
+        'dupes' is a Dupes object (As per the return value of
+        locate_dupes), and 'description' and 'return_code' are
+        a string and an integer as per the return of Dupes.status().
     """
 
     result_tuple = collections.namedtuple(
