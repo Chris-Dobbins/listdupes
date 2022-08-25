@@ -92,7 +92,7 @@ class _ProgressCounter(_Cursor):
 
     def print_counter(self, current_index):
         """Counter designed to be inserted in loops."""
-        counter_value = str(current_index + 1).rjust(self.length_of_total, "0")
+        counter_value = str(current_index).rjust(self.length_of_total, "0")
         print(
             counter_value,
             self.move_to_start_of_counter,
@@ -143,7 +143,7 @@ class _ProgressCounter(_Cursor):
 
     def print_zero_to_counter(self):
         """Print a zero. Use this to initialize the counter."""
-        self.print_counter(-1)  # print_counter adds one to its arg.
+        self.print_counter("0")
 
     def end_count(self, append_newline=True):
         """Place the cursor at the end of the line and show it."""
@@ -950,9 +950,9 @@ def checksum_files(
     os_errors = errors_state
     place = 0  # Any prior place count is added during finalizing.
     try:
-        for index, file_path in enumerate(paths):
-            place = index
+        for index, file_path in enumerate(paths, start=1):
             _checksum_file_and_store_outcome(file_path, paths_and_sums, os_errors)
+            place = index
     finally:
         if cache_details:
             total_place = place_state + place
@@ -985,9 +985,9 @@ def checksum_files_and_show_progress(
     place = 0  # Any prior place count is added during finalizing.
     try:
         checksum_progress.print_text_for_counter()
-        for index, file_path in enumerate(paths):
-            place = index
+        for index, file_path in enumerate(paths, start=1):
             _checksum_file_and_store_outcome(file_path, paths_and_sums, os_errors)
+            place = index
             checksum_progress.print_counter(index)
     finally:
         if cache_details:
@@ -1039,7 +1039,7 @@ def locate_dupes_and_show_progress(checksum_result, sort_key=None):
         comparisons_progress.print_text_for_counter()
         for index, element in enumerate(checksum_result.paths_and_sums):
             path_being_searched, checksum_being_searched = element
-            comparisons_progress.print_counter(index)
+            comparisons_progress.print_counter(index + 1)
 
             for path, checksum in checksum_result.paths_and_sums[index + 1 :]:
                 checksums_are_equal = checksum_being_searched == checksum
