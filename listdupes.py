@@ -3,7 +3,7 @@
 """Check a folder and its subfolders for duplicate files.
 
 Checks all files except for folders and those starting with a period.
-Writes its output to listdupes_output.csv in the user's home folder.
+Writes the results to listdupes_output.csv in the user's home folder.
 """
 
 # Module Attributes
@@ -344,7 +344,10 @@ def _get_listdupes_args(overriding_args=None):
         "-a",
         "--archive_folder",
         action="store_true",
-        help="Write the paths found in the starting folder to a file and quit.",
+        help=(
+            "Store the paths found in the starting folder in"
+            " a listdupes archive and quit."
+        ),
     )
     parser.add_argument(
         "-f",
@@ -361,19 +364,19 @@ def _get_listdupes_args(overriding_args=None):
         "-j",
         "--json",
         action="store_true",
-        help="Write the output as a JSON file instead of a CSV.",
+        help="Write the results as a JSON file instead of a CSV spreadsheet.",
     )
     parser.add_argument(
         "-p",
         "--progress",
         action="store_true",
-        help="Print a progress counter to stderr. This may slow things down.",
+        help="Display a progress counter. This may slow things down slightly.",
     )
     parser.add_argument(
         "-r",
         "--read_archive",
         action="store_true",
-        help="Read paths from an archive file instead of from a starting folder.",
+        help="Read paths from a listdupes archive instead of from a starting folder.",
     )
     args = parser.parse_args(args=overriding_args)
     return args
