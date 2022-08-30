@@ -621,9 +621,14 @@ def _do_pre_checksumming_tasks(
 
     # Archive subpaths to a file and exit if -a has been passed.
     if write_archive:
-        sub_paths = _find_sub_paths(starting_path, show_work_message=show_progress)
+        absolute_starting_path = starting_path.resolve()
+        sub_paths = _find_sub_paths(
+            absolute_starting_path, show_work_message=show_progress
+        )
         sorted_sub_paths = sorted(sub_paths)
-        _write_archive_to(unique_path.folder_archive, sorted_sub_paths, starting_path)
+        _write_archive_to(
+            unique_path.folder_archive, sorted_sub_paths, absolute_starting_path
+        )
         message = "The folder has been archived."
         return result_tuple(None, {}, main_return_constructor(message, 0))
 
