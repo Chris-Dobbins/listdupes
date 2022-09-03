@@ -201,10 +201,12 @@ class _Cache(_PersistantData):
             ]
         except (json.JSONDecodeError, KeyError):
             message = (
-                "The cache file couldn't be read. It may have been accidently\n"
-                "overwritten by another program. Please remove it from\n"
-                f"{self.path.parent}\n"
-                "or simply delete it."
+                "The contents of the cache file can no longer be verfied.\n"
+                "Most likely it was accidently overwritten by another app.\n"
+                "You may wish to check its contents to learn more, or simply"
+                " delete the file.\n"
+                "Once it's removed you can rerun your last command to"
+                " restart the work."
             )
             raise _ValidationError(message)
         self.update(cached)
