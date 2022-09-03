@@ -120,7 +120,7 @@ class _Archive(_PersistantData):
             return ""
 
     def read_and_set_shared_creation_and_start_values(self):
-        """Get crucial values from the backing file via a short read."""
+        """Get crucial values from the storage file via a short read."""
         time, path = self.read_values_shared_by_an_archive_and_cache()
         self["creation_time"] = time
         self["starting_path"] = path
@@ -144,7 +144,7 @@ class _Archive(_PersistantData):
         self.update(archived)
 
     def write_to_file(self, sub_paths, starting_folder, **kwargs):
-        """Dump the subpaths to the archive file."""
+        """Write the subpaths to the archive's storage file."""
         kwargs_for_open = {"mode": "x", "encoding": "utf-8", "errors": "replace"}
         kwargs_for_open.update(**kwargs)  # Allows override of defaults.
         json_safe_subpaths = [str(path) for path in sub_paths]
@@ -166,7 +166,7 @@ class _Cache(_PersistantData):
         super().__init__(path)
 
     def read_and_set_shared_creation_and_start_values(self, validation_value=""):
-        """Get crucial values from the backing file via a short read."""
+        """Get crucial values from the storage file via a short read."""
         message = (
             "The cache file is holding work which was done on another archive.\n"
             "Please save that work by moving the cache file to another location\n"
@@ -182,7 +182,7 @@ class _Cache(_PersistantData):
             raise _ValidationError(message)
 
     def read_items_from_file(self, **kwargs):
-        """Read the state of a checksum_files function from the file."""
+        """Read the state of a function from the cache file."""
         kwargs_for_open = {"mode": "r", "encoding": "utf-8", "errors": "replace"}
         kwargs_for_open.update(**kwargs)  # Allows override of defaults.
         try:
@@ -210,10 +210,10 @@ class _Cache(_PersistantData):
         self.update(cached)
 
     def write_to_file(self, paths_and_sums, os_errors, place, **kwargs):
-        """Write the state of a checksum_files function to the file.
+        """Write the state of a function to the cache file.
 
         Args:
-            paths_and_sums: A tuple (path-like object, Int).
+            paths_and_sums: A tuple (path-like object, int).
             os_errors: A dictionary with info on suppressed os errors
             place: An integer representing the last completed checksum.
             **kwargs: Passed to the open function.
@@ -427,7 +427,7 @@ class Dupes(collections.defaultdict):
         return result_tuple(description, return_code)
 
     def sum_length_of_values(self):
-        """Sum the lengths of an instance's values and return the sum."""
+        """Sum the lengths of all the values and return the sum."""
         sum_of_lengths = sum([len(mapped_value) for mapped_value in self.values()])
         return sum_of_lengths
 
@@ -457,8 +457,8 @@ class Dupes(collections.defaultdict):
             file: A path-like object or integer file descriptor.
             labels: A iterable of strings or numbers which are written
                 once as the first row of the file. To omit the label row
-                pass []. To print a blank row pass ['', '']. The default
-                is ['File', 'Duplicates']
+                pass []. To print a blank row pass ['', ''].
+                The default is ['File', 'Duplicates'].
             **kwargs: Passed to open().
         """
 
@@ -511,7 +511,7 @@ class PreviousFileNotFoundError(Exception):
 
 
 class _ValidationError(Exception):
-    """A file backing an _Archive or _Cache obj can't be validated."""
+    """A file storing an _Archive or _Cache obj can't be validated."""
 
     def __init__(self, message):
         self.message = message
@@ -595,7 +595,7 @@ def _get_listdupes_args(overriding_args=None):
 
 
 def _make_file_path_unique(path):
-    """Make a similarly named path object if a path already exists.
+    """Make a similarly named Path object if a path already exists.
 
     Args:
         path: An instance of pathlib.Path or its subclasses.
@@ -749,8 +749,8 @@ def _do_pre_checksumming_tasks(
             None, None, None, main_return_constructor(issue_with_starting_path, 1)
         )
 
-    # Exit early if the archive isn't a valid file
-    # or doesn't match the existing cache.
+    # Exit early if the archive or cache aren't valid files
+    # or don't belong to each other.
     if read_archive:
         hardcoded_cache_path = pathlib.Path("~", "listdupes_cache").expanduser()
         archive = _Archive(starting_path)
@@ -792,7 +792,7 @@ def get_checksum_input_values(
     archive=None,
     cache=None,
 ):
-    """Return the initial values to pass to a checksum function.
+    """Return the initial values to pass to a checksum_files function.
 
     Args:
         starting_path: An instance of pathlib.Path or its subclasses.
@@ -804,18 +804,17 @@ def get_checksum_input_values(
             Defaults to None.
 
     Returns:
-        A named tuple (paths, paths_and_sums, os_errors, place,
-        cache_details).
+        A named tuple (paths, paths_and_sums, os_errors, place).
 
         'paths' is a list of pathlib.Path objects.
 
         'paths_and_sums' is a list which is either empty or contains
-        tuples of (Path object, Int) which pair a Path object and
+        tuples of (Path object, int) which pair a Path object and
         the checksum of the associated file.
 
         'os_errors' is a dictionary with keys for suppressed os errors
         which are mapped to sets which may be empty, or may contain
-        tuples of (Str, Str) pairing a string representation of
+        tuples of (str, str) pairing a string representation of
         a path with a string describing the error that file raised.
 
         'place' is an integer representing the index of the last file
@@ -899,11 +898,11 @@ def _checksum_file_and_store_outcome(
     Args:
         file_path: An instance of pathlib.Path or its subclasses.
         results_container: A container which is either empty or which
-            contains tuples of (path-like object, Int) which pair
+            contains tuples of (path-like object, int) which pair
             a path with the checksum of the associated file.
         errors_container: A dictionary with keys for suppressed
             os errors mapped to sets which may be empty, or may contain
-            tuples of (Str, Str) pairing a string representation of
+            tuples of (str, str) pairing a string representation of
             a path with a string describing the error that file raised.
         generator: The generator function taking one positonal arg
             which is used to split the file. The default is _chunk_file.
@@ -950,11 +949,11 @@ def checksum_files(
     Args:
         paths: A container of path-like objects.
         results_state: A container which is either empty or which
-            contains tuples of (path-like object, Int) which pair
+            contains tuples of (path-like object, int) which pair
             a path with the checksum of the associated file.
         errors_state: A dictionary with keys for suppressed os errors
             which are mapped to sets which may be empty, or may contain
-            tuples of (Str, Str) pairing a string representation of
+            tuples of (str, str) pairing a string representation of
             a path with a string describing the error that file raised.
         place_state: An integer representing the index of the last file
             in an archive to be checksummed and cached.
@@ -966,9 +965,9 @@ def checksum_files(
 
     Returns:
         A named tuple (paths_and_sums, os_errors), where
-        paths_and_sums is a list of tuples which contain a path-like
-        object and the checksum integer of the associated file,
-        and os_errors is a dictionary with info on suppressed os errors.
+        'paths_and_sums' is a list of tuples which contain a path-like
+        object and the checksum integer of the associated file, and
+        'os_errors' is a dictionary with info on suppressed os errors.
     """
 
     result_tuple = collections.namedtuple(
@@ -1031,8 +1030,8 @@ def locate_dupes(checksum_result, sort_key=None):
     """Locate duplicate files by comparing their checksums.
 
     Args:
-        checksum_result: A named tuple as per the result of one of the
-            two checksum function.
+        checksum_result: A named tuple as per the result of one of
+            the two checksum _files functions.
         sort_key: A function for sorting the return value's
             collections. The default of None dictates an ascending sort.
 
