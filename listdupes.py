@@ -779,6 +779,7 @@ def _do_pre_checksumming_tasks(
             absolute_starting_path, show_work_message=show_progress
         )
         sorted_sub_paths = sorted(sub_paths)
+        archive = _Archive(unique_path.folder_archive)
         archive.write_to_file(sorted_sub_paths, absolute_starting_path)
         message = "The folder has been archived."
         return result_tuple(None, None, None, main_return_constructor(message, 0))
