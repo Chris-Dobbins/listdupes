@@ -102,12 +102,6 @@ class _ProgressCounter(_Cursor):
             end="",
         )
 
-    def print_counter_and_end_count(self, current_index):
-        """Convenience method that might be a touch slower."""
-        self.print_counter(current_index)
-        if (current_index + 1) == self.total_to_be_counted:
-            self.end_count()
-
     def print_text_before_counter(self):
         """Provide context about a counter by printing text before it.
 
