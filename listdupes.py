@@ -674,7 +674,7 @@ def _read_cache_from(file, **kwargs):
         cached["starting_path_from_archive"]
     )
     for key, value in cached["os_errors"].items():
-        cached["os_errors"][key] = [(x, y) for x, y in value]
+        cached["os_errors"][key] = {(x, y) for x, y in value}
     cached["paths_and_sums"] = [
         (pathlib.Path(x), y) for x, y in cached["paths_and_sums"]
     ]
