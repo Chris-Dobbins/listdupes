@@ -941,28 +941,28 @@ def _checksum_file_and_store_outcome(
 
 def checksum_files(
     paths,
-    results_state,
-    errors_state,
+    paths_and_sums_state,
+    os_errors_state,
     place_state=0,
-    cache=None,
+    writer=None,
     sort_key=None,
 ):
     """Checksum files and return their paths, checksums, and errors.
 
     Args:
         paths: A container of path-like objects.
-        results_state: A container which is either empty or which
+        paths_and_sums_state: A container which is either empty or which
             contains tuples of (path-like object, int) which pair
             a path with the checksum of the associated file.
-        errors_state: A dictionary with keys for suppressed os errors
+        os_errors_state: A mapping with keys for suppressed os errors
             which are mapped to sets which may be empty, or may contain
             tuples of (str, str) pairing a string representation of
             a path with a string describing the error that file raised.
         place_state: An integer representing the index of the last file
             in an archive to be checksummed and cached.
             If no cache exists it defaults to 0.
-        cache: Only for internal use. Either None or a _Cache object.
-            Defaults to None.
+        writer: Either None or a callable which takes three arguments,
+            as per that passed to search_for_dupes. Defaults to None.
         sort_key: A function for sorting the returned collections.
             The default of None dictates an ascending sort.
 
@@ -976,17 +976,17 @@ def checksum_files(
     result_tuple = collections.namedtuple(
         "checksum_files_return_tuple", ["paths_and_sums", "os_errors"]
     )
-    paths_and_sums = results_state
-    os_errors = errors_state
+    paths_and_sums = paths_and_sums_state
+    os_errors = os_errors_state
     place = 0  # Any prior place count is added during finalizing.
     try:
         for index, file_path in enumerate(paths, start=1):
             _checksum_file_and_store_outcome(file_path, paths_and_sums, os_errors)
             place = index
     finally:
-        if cache:
+        if writer:
             total_place = place_state + place
-            cache.write_to_file(paths_and_sums, os_errors, total_place)
+            writer(paths_and_sums, os_errors, total_place)
     paths_and_sums.sort(key=sort_key)
     os_errors = {k: sorted(v, key=sort_key) for k, v in os_errors.items()}
     return result_tuple(paths_and_sums, os_errors)
@@ -994,10 +994,10 @@ def checksum_files(
 
 def checksum_files_and_show_progress(
     paths,
-    results_state,
-    errors_state,
+    paths_and_sums_state,
+    os_errors_state,
     place_state=0,
-    cache=None,
+    writer=None,
     sort_key=None,
 ):
     """As checksum_files but print the loop's progress to terminal."""
@@ -1010,8 +1010,8 @@ def checksum_files_and_show_progress(
     result_tuple = collections.namedtuple(
         "checksum_files_return_tuple", ["paths_and_sums", "os_errors"]
     )
-    paths_and_sums = results_state
-    os_errors = errors_state
+    paths_and_sums = paths_and_sums_state
+    os_errors = os_errors_state
     place = 0  # Any prior place count is added during finalizing.
     try:
         checksum_progress.print_text_for_counter()
@@ -1020,9 +1020,9 @@ def checksum_files_and_show_progress(
             place = index
             checksum_progress.print_counter(index)
     finally:
-        if cache:
+        if writer:
             total_place = place_state + place
-            cache.write_to_file(paths_and_sums, os_errors, total_place)
+            writer(paths_and_sums, os_errors, total_place)
         checksum_progress.end_count()
     paths_and_sums.sort(key=sort_key)
     os_errors = {k: sorted(v, key=sort_key) for k, v in os_errors.items()}
@@ -1081,14 +1081,19 @@ def locate_dupes_and_show_progress(checksum_result, sort_key=None):
     return dupes
 
 
-def search_for_dupes(checksum_input, cache=None, show_progress=False):
+def search_for_dupes(checksum_input, writer=None, show_progress=False):
     """Search a collection of paths for duplicate files.
 
     Args:
         checksum_input: A named tuple as per the return value of
             get_checksum_input_values().
-        cache: Only for internal use. Either None or a _Cache object.
-            Defaults to None.
+        writer: Either None or a callable which takes three arguments.
+            1st a container as per a checksum_files function's
+            paths_and_sums_state arg, 2nd a mapping as per its
+            os_errors_state arg and 3rd an int storing the index of
+            the last file checksummed. The writer is called before any
+            KeyboardInterrupt is raised, so as to cache
+            the function's work. Defaults to None.
         show_progress: A bool indicating whether to display the progress
             of checksumming and comparison processes. Defaults to False.
     Returns:
@@ -1109,7 +1114,7 @@ def search_for_dupes(checksum_input, cache=None, show_progress=False):
             checksum_input.paths_and_sums,
             checksum_input.os_errors,
             place_state=checksum_input.place,
-            cache=cache,
+            writer=writer,
         )
         dupes = locate_dupes_and_show_progress(checksum_result)
     else:
@@ -1118,7 +1123,7 @@ def search_for_dupes(checksum_input, cache=None, show_progress=False):
             checksum_input.paths_and_sums,
             checksum_input.os_errors,
             place_state=checksum_input.place,
-            cache=cache,
+            writer=writer,
         )
         dupes = locate_dupes(checksum_result)
 
@@ -1262,8 +1267,9 @@ def main(overriding_args=None):
     )
 
     # Search for dupes and describe the result to the user.
+    writer_arg = cache.write_to_file if cache else None
     search_result = search_for_dupes(
-        checksum_input_values, cache=cache, show_progress=args.progress
+        checksum_input_values, writer=writer_arg, show_progress=args.progress
     )
     os_errors = search_result.dupes.checksum_result.os_errors
     print(search_result.description, file=sys.stderr)
