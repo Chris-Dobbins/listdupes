@@ -201,8 +201,8 @@ class _Cache(_PersistantData):
             ]
         except (json.JSONDecodeError, KeyError):
             message = (
-                "The contents of the cache file can no longer be verfied.\n"
-                "Most likely it was accidently overwritten by another app.\n"
+                "The contents of the cache file can no longer be verified.\n"
+                "Most likely it was accidentally overwritten by another app.\n"
                 "You may wish to check its contents to learn more, or simply"
                 " delete the file.\n"
                 "Once it's removed you can rerun your last command to"
@@ -907,7 +907,7 @@ def _checksum_file_and_store_outcome(
             os errors mapped to sets which may be empty, or may contain
             tuples of (str, str) pairing a string representation of
             a path with a string describing the error that file raised.
-        generator: The generator function taking one positonal arg
+        generator: The generator function taking one positional arg
             which is used to split the file. The default is _chunk_file.
     """
 
