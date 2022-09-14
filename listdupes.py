@@ -921,14 +921,20 @@ def _checksum_file_and_store_outcome(
     except IsADirectoryError:
         return  # Don't count a directory as an error, just move on.
     except PermissionError as e:
-        errors_container["permission_errors"].add((e.filename, e.strerror))
+        file_name = e.filename or str(file_path)
+        error_text = e.strerror or ""
+        errors_container["permission_errors"].add((file_name, error_text))
         return
     except FileNotFoundError as e:
-        errors_container["file_not_found_errors"].add((e.filename, e.strerror))
+        file_name = e.filename or str(file_path)
+        error_text = e.strerror or ""
+        errors_container["file_not_found_errors"].add((file_name, error_text))
         _check_path_for_disconnection(file_path)
         return
     except OSError as e:
-        errors_container["misc_errors"].add((e.filename, e.strerror))
+        file_name = e.filename or str(file_path)
+        error_text = e.strerror or ""
+        errors_container["misc_errors"].add((file_name, error_text))
         return
     results_container.append((file_path, checksum))
 
@@ -1133,8 +1139,11 @@ def _write_any_errors_to(file_path, error_mapping, **kwargs):
         return None
     with open(file_path, **kwargs_for_open) as file:
         for value in error_mapping.values():
-            for path, error in value:
-                file.write(f"'{path}' raised '{error}' and was not read.\n")
+            for path, error_text in value:
+                error_text = (
+                    f"'{error_text}'" if error_text else "an error with no description"
+                )
+                file.write(f"'{path}' raised {error_text} and was not read.\n")
     return None
 
 
