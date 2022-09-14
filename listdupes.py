@@ -18,7 +18,7 @@ __all__ = [
     "search_for_dupes",
     "PreviousFileNotFoundError",
 ]
-__version__ = "6.0.0-beta.5"
+__version__ = "6.0.0-beta.6"
 __author__ = "Chris Dobbins"
 __license__ = "BSD-2-Clause"
 
@@ -308,12 +308,6 @@ class _ProgressCounter(_Cursor):
             sep="",
             end="",
         )
-
-    def print_counter_and_end_count(self, current_index):
-        """Convenience method that might be a touch slower."""
-        self.print_counter(current_index)
-        if (current_index + 1) == self.total_to_be_counted:
-            self.end_count()
 
     def print_text_before_counter(self):
         """Provide context about a counter by printing text before it.
